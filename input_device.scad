@@ -27,14 +27,23 @@ SHOW_CUTOUTS = true;
 // Show actual buttons 
 SHOW_BUTTONS = true;
 // Show bottom case
-SHOW_BOTTOM = true;
+SHOW_BOTTOM = false;
 // Show top case
 SHOW_TOP = true;
 // Gap between top and bottom for assembly visualization
 ASSEMBLY_GAP = 10;
 
 // Use either a supplied layout or one of the built-in layout functions
-button_layout = [];
+button_layout = [
+    // W key (centered above S)
+    [0, 19, 18],
+    
+    // A, S, D keys (horizontal row)
+    [-19, 0, 18],  // A key
+    [0, 0, 18],    // S key
+    [19, 0, 18]   // D key
+    
+];
 
 // Customize parameters as needed
 // Format: [case_width, case_depth, wall_thickness, corner_radius, top_thickness, button_size, edge_margin, lip_height, lip_clearance, case_height]
@@ -46,12 +55,12 @@ button_params =
     0, //case_depth
     2.5, //wall_thickness
     2, //corner_radius
-    4, //top_thickness
+    2, //top_thickness
     2, //button_size
-    20, //edge_margin
-    3, //lip_height
-    0.25, //lip_clearance
-    15 //case_height
+    8, //edge_margin
+    2, //lip_height
+    0.1, //lip_clearance
+    6 //case_height
 ];
 
 /* [Hidden] */
@@ -100,12 +109,8 @@ function get_center_offset(layout, button_size) =
     [center_x, center_y];
 
 // Button layout visualization 
-module place_buttons(layout, params=[], 
-                     button_size=DEFAULT_BUTTON_SIZE, 
-                     show_outlines=false) {
-    btn_size = (params != [] && params[5] != undef) ? params[5] : button_size;
+module place_buttons(layout, btn_size, top_thickness, case_height, case_width, show_outlines=false) {
     offset = get_center_offset(layout, btn_size);
-    
     for (btn = layout) {
         x = btn[0] - offset[0];
         y = btn[1] - offset[1]; 
@@ -115,12 +120,12 @@ module place_buttons(layout, params=[],
             if (SHOW_BUTTONS) {
                 // Actual button
                 scale([BUTTON_VISUAL_SCALE, BUTTON_VISUAL_SCALE, 1])
-                color("lightgray") create_button(size);
+                color("lightgray") create_button(size, top_thickness, case_height, case_width);
             }
             
             if (show_outlines) {
                 // Outline for debugging
-                #cylinder(h=0.1, d=size);
+                cylinder(h=0.1, d=size);
             }
         }
     }
@@ -129,35 +134,30 @@ module place_buttons(layout, params=[],
 // Top plate with button cutouts
 module top_plate(layout, params=[]) {
     // Extract parameters with defaults
-    case_width = (params != [] && params[0] != undef) ? params[0] : DEFAULT_CASE_WIDTH;
-    case_depth = (params != [] && params[1] != undef) ? params[1] : DEFAULT_CASE_DEPTH;
-    corner_radius = (params != [] && params[3] != undef) ? params[3] : DEFAULT_CORNER_RADIUS;
-    top_thickness = (params != [] && params[4] != undef) ? params[4] : DEFAULT_TOP_THICKNESS;
-    button_size = (params != [] && params[5] != undef) ? params[5] : DEFAULT_BUTTON_SIZE;
-    edge_margin = (params != [] && params[6] != undef) ? params[6] : DEFAULT_EDGE_MARGIN;
-    wall_thickness = (params != [] && params[2] != undef) ? params[2] : DEFAULT_WALL_THICKNESS;
-    lip_height = (params != [] && params[7] != undef) ? params[7] : DEFAULT_LIP_HEIGHT;
-    lip_clearance = (params != [] && params[8] != undef) ? params[8] : DEFAULT_LIP_CLEARANCE;
+    case_width = params[0];
+    case_depth = params[1];
+    wall_thickness = params[2];
+    corner_radius = params[3];
+    top_thickness = params[4];
+    button_size = params[5];
+    edge_margin = params[6];
+    lip_height = params[7];
+    lip_clearance = params[8];  
     
-    // Calculate dimensions from layout if needed
-    auto_size = (case_width == 0 || case_depth == 0);
-    case_dims = auto_size ? 
-                get_case_dimensions(layout, button_size, edge_margin) : 
-                [case_width, case_depth];
-    center_offset = get_center_offset(layout, button_size);
-    
+    offset = get_center_offset(layout, button_size);
+
     difference() {
         // Main plate
         difference() {
             // Solid shape
-            cuboid([case_dims[0], case_dims[1], top_thickness], 
+            cuboid([case_width, case_depth, top_thickness], 
                     rounding=corner_radius, edges="Z", anchor=BOTTOM);
             
             // Button cutouts
             if (SHOW_CUTOUTS) {
                 for (btn = layout) {
-                    x = btn[0] - center_offset[0];
-                    y = btn[1] - center_offset[1];
+                    x = btn[0] - offset[0];
+                    y = btn[1] - offset[1];
                     size = len(btn) > 2 ? btn[2] : button_size;
                     
                     translate([x, y, 0])
@@ -168,8 +168,8 @@ module top_plate(layout, params=[]) {
     }
     
     // Add lip for better fit
-    lip_width = case_dims[0] - 2 * (wall_thickness + lip_clearance);
-    lip_depth = case_dims[1] - 2 * (wall_thickness + lip_clearance);
+    lip_width = case_width - 2 * (wall_thickness + lip_clearance);
+    lip_depth = case_depth - 2 * (wall_thickness + lip_clearance);
     
     up(lip_height/2+top_thickness/2) {
         difference() {
@@ -178,8 +178,8 @@ module top_plate(layout, params=[]) {
             
             // Cut any overlapping holes
             for (btn = layout) {
-                x = btn[0] - center_offset[0];
-                y = btn[1] - center_offset[1];
+                x = btn[0] - offset[0];
+                y = btn[1] - offset[1];
                 size = len(btn) > 2 ? btn[2] : button_size;
                 
                 translate([x, y, -0.1])
@@ -191,37 +191,51 @@ module top_plate(layout, params=[]) {
 
 // Bottom case
 module bottom_case(layout, params=[]) {
-    // Extract parameters with defaults
-    case_width = (params != [] && params[0] != undef) ? params[0] : DEFAULT_CASE_WIDTH;
-    case_depth = (params != [] && params[1] != undef) ? params[1] : DEFAULT_CASE_DEPTH;
-    case_height = (params != [] && params[9] != undef) ? params[9] : DEFAULT_CASE_HEIGHT;
-    wall_thickness = (params != [] && params[2] != undef) ? params[2] : DEFAULT_WALL_THICKNESS;
-    corner_radius = (params != [] && params[3] != undef) ? params[3] : DEFAULT_CORNER_RADIUS;
-    button_size = (params != [] && params[5] != undef) ? params[5] : DEFAULT_BUTTON_SIZE;
-    edge_margin = (params != [] && params[6] != undef) ? params[6] : DEFAULT_EDGE_MARGIN;
-    
-    // Calculate dimensions from layout if needed
-    auto_size = (case_width == 0 || case_depth == 0);
-    case_dims = auto_size ? 
-                get_case_dimensions(layout, button_size, edge_margin) : 
-                [case_width, case_depth];
-    
+    // Extract parameters
+    case_width = params[0];
+    case_depth = params[1];
+    wall_thickness = params[2];
+    corner_radius = params[3];
+    button_size = params[5];
+    lip_height = params[7];
+    case_height = params[9];
+
+    offset = get_center_offset(layout, button_size);
+       
+    // Outer shell
     difference() {
-        union() {
-            // Outer shell
-            difference() {
-                // Solid case
-                cuboid([case_dims[0], case_dims[1], case_height], 
-                        rounding=corner_radius, except=TOP, anchor=BOTTOM);
-            
-                // Inner cutout
-                translate([0, 0, wall_thickness])
-                cuboid([case_dims[0] - 2*wall_thickness, 
-                        case_dims[1] - 2*wall_thickness, 
-                        case_height], 
-                        rounding=corner_radius, except=TOP, anchor=BOTTOM);
+        // Solid case
+        cuboid([case_width, case_depth, case_height], 
+                rounding=corner_radius, except=TOP, anchor=BOTTOM);
+    
+        // Inner cutout
+        translate([0, 0, wall_thickness])
+        cuboid([case_width - 2*wall_thickness, 
+                case_depth - 2*wall_thickness, 
+                case_height], 
+                rounding=corner_radius, except=BOTTOM, anchor=BOTTOM);
+
+        // Button cutouts
+        if (SHOW_CUTOUTS) {
+            for (btn = layout) {
+                x = btn[0] - offset[0];
+                y = btn[1] - offset[1];
+                size = len(btn) > 2 ? btn[2] : button_size;
+                
+                translate([x, y, 0])
+                cylinder(h=wall_thickness+0.2, d=size);
             }
         }
+    }
+
+    //Create touchpoints
+    for (btn = layout) {
+        x = btn[0] - offset[0];
+        y = btn[1] - offset[1];
+        size = len(btn) > 2 ? btn[2] : button_size;
+        
+        translate([x, y, 0])
+        color("black") cylinder(h=wall_thickness, d=size);
     }
 }
 
@@ -250,26 +264,29 @@ module input_device(layout, params=[]) {
     case_dims = auto_size ? 
                 get_case_dimensions(layout, button_size, edge_margin) : 
                 [case_width, case_depth];
-                
+
+    parameters = [case_dims[0], case_dims[1], wall_thickness, corner_radius, 
+                  top_thickness, button_size, edge_margin, lip_height, 
+                  lip_clearance, case_height];
+
     if (SHOW_TOP) {
         if (SHOW_ASSEMBLED) {
             up(case_height+top_thickness)
             rotate([0,180,0])
             {
-                top_plate(layout, params);
-                place_buttons(layout, params);
+                top_plate(layout, parameters);
+                place_buttons(layout, button_size, top_thickness, case_height-wall_thickness, case_dims[0]);
             }
         } else {
             // Show top separated for better visibility
-            right(200)  {
-                top_plate(layout, params);
-                place_buttons(layout, params);
+            right(case_dims[0]+ASSEMBLY_GAP) {
+                top_plate(layout, parameters);
+                place_buttons(layout, button_size, top_thickness, case_height-wall_thickness, case_dims[0]);
             }
         }
     }
-    
     if (SHOW_BOTTOM) {
-        bottom_case(layout, params);
+        bottom_case(layout, parameters);
     }
 }
 
