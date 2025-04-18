@@ -477,7 +477,7 @@ main_assembly();
                 setTimeout(() => {
                     process.kill();
                     reject(new Error('OpenSCAD operation timed out after 3 minutes'));
-                }, 180000); // 3 minute timeout
+                }, 480000); // 8 minute timeout
             });
 
             // Check if STL file was created and has valid content
