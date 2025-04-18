@@ -29,9 +29,17 @@ app.use(cors());
 app.use(bodyParser.json({limit: '50mb'}));
 app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
 
-// create temporary directory
+// Create temporary directory if it doesn't exist
 const tempDir = path.join(__dirname, 'temp');
-fs.ensureDirSync(tempDir);
+try {
+    if (!fs.existsSync(tempDir)) {
+        console.log(`Temp directory not found, creating at: ${tempDir}`);
+        fs.mkdirSync(tempDir, { recursive: true });
+    }
+} catch (err) {
+    console.error(`Error creating temp directory: ${err}`);
+    process.exit(1); // Exit if we can't create the temp directory since it's critical
+}
 
 // Initialize PrusaSlicer config
 config.initializePrusaSlicerConfig()
@@ -342,6 +350,7 @@ app.post('/api/convert-to-scad', async (req, res) => {
 
         // Check if buttonLayout exists and handle different formats
         let buttonLayout;
+        let buttonParams;
 
         if (req.body.buttonLayout) {
             buttonLayout = req.body.buttonLayout;
@@ -350,22 +359,40 @@ app.post('/api/convert-to-scad', async (req, res) => {
             try {
                 const parsed = JSON.parse(req.body);
                 buttonLayout = parsed.buttonLayout;
+                buttonParams = parsed.buttonParams;
             } catch (e) {
                 console.error('Failed to parse request body as JSON:', e);
             }
         } else if (req.body.scadCommand) {
             // Extract from scadCommand if that's how it's being sent
-            const match = req.body.scadCommand.match(/button_layout=(\[\[.*?\]\])/);
-            if (match && match[1]) {
+            // Handle button_layout
+            const layoutMatch = req.body.scadCommand.match(/button_layout=(\[\[.*?\]\])/);
+            if (layoutMatch && layoutMatch[1]) {
                 try {
-                    buttonLayout = JSON.parse(match[1].replace(/'/g, '"'));
+                    buttonLayout = JSON.parse(layoutMatch[1].replace(/'/g, '"'));
                 } catch (e) {
                     console.error('Failed to parse buttonLayout from scadCommand:', e);
                 }
             }
+
+            // Handle button_params if included in scadCommand
+            const paramsMatch = req.body.scadCommand.match(/button_params=(\[.*?\])/);
+            if (paramsMatch && paramsMatch[1]) {
+                try {
+                    buttonParams = JSON.parse(paramsMatch[1].replace(/'/g, '"'));
+                } catch (e) {
+                    console.error('Failed to parse buttonParams from scadCommand:', e);
+                }
+            }
+        }
+
+        // Also check for explicit buttonParams in the request body
+        if (req.body.buttonParams && !buttonParams) {
+            buttonParams = req.body.buttonParams;
         }
 
         console.log('Parsed buttonLayout:', buttonLayout);
+        console.log('Parsed buttonParams:', buttonParams);
 
         if (!buttonLayout) {
             return res.status(400).send('Missing or invalid button layout configuration');
@@ -390,15 +417,25 @@ app.post('/api/convert-to-scad', async (req, res) => {
             return res.status(500).send('Required SCAD files not found');
         }
 
-        // Create a new SCAD file that imports the existing files and passes the button layout
-        // Use absolute paths for the include statements to avoid relative path issues
-        const scadContent = `
+        // Create a new SCAD file that imports the existing files and passes the button layout and params
+        let scadContent = `
 include <${inputDeviceScad.replace(/\\/g, '/')}>
 include <${parametricButtonScad.replace(/\\/g, '/')}>
 
 // Button layout configuration
 button_layout=${JSON.stringify(buttonLayout)};
+`;
 
+        // Add button_params if provided
+        if (buttonParams) {
+            scadContent += `
+// Button parameters
+button_params=${JSON.stringify(buttonParams)};
+`;
+        }
+
+        // Call main function
+        scadContent += `
 // Call main function or module from your files
 main_assembly();
 `;
