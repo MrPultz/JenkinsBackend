@@ -201,7 +201,6 @@ module top_plate(layout, params=[]) {
                 translate([x, y, 0])
                 cylinder(h=top_thickness+0.2, d=size);
             }
-            //wires(layout, case_width, button_size, top_thickness);
         }
     }
     
@@ -342,7 +341,6 @@ module input_device(layout, params=[]) {
                         // Show buttons
                         place_buttons(layout, button_size, top_thickness, case_height-wall_thickness, case_dims[0], case_dims[1]);
                         }
-                    wires(layout, case_dims[0], button_size, top_thickness);
                 }
                 
                 
@@ -362,9 +360,9 @@ module input_device(layout, params=[]) {
     if (SHOW_BOTTOM) {
         difference() {
                 bottom_case(layout, parameters);
-                wires(layout, case_dims[0], button_size, top_thickness);
+                //wires(layout, case_dims[0], button_size, top_thickness);
             }
-            wires(layout, case_dims[0], button_size, wall_thickness);
+            //wires(layout, case_dims[0], button_size, wall_thickness);
     }
 }
 
