@@ -488,7 +488,7 @@ button_params = ${formatArrayForOpenSCAD(buttonParams)};
                 setTimeout(() => {
                     process.kill();
                     reject(new Error('OpenSCAD operation timed out after 3 minutes'));
-                }, 480000); // 3 minute timeout
+                }, 1480000); // 3 minute timeout
             });
 
             // Check if STL file was created and has valid content
