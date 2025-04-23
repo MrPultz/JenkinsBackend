@@ -397,7 +397,7 @@ include <${inputDeviceScad.replace(/\\/g, '/')}>
 include <${parametricButtonScad.replace(/\\/g, '/')}>
 
 // Button layout configuration
-button_layout=${JSON.stringify(buttonLayout)};
+-D button_layout=${JSON.stringify(buttonLayout)};
 
 // Call main function or module from your files
 main_assembly();
@@ -439,8 +439,8 @@ main_assembly();
                 // Set a timeout in case OpenSCAD hangs
                 setTimeout(() => {
                     process.kill();
-                    reject(new Error('OpenSCAD operation timed out after 3 minutes'));
-                }, 180000); // 3 minute timeout
+                    reject(new Error('OpenSCAD operation timed out after 8 minutes'));
+                }, 360000); // 16 minute timeout
             });
 
             // Check if STL file was created and has valid content
