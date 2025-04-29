@@ -600,31 +600,42 @@ app.post('/api/convert-to-scad', async (req, res) => {
             return res.status(500).send('Required SCAD files not found');
         }
 
+        // Format button layout for OpenSCAD
+        // OpenSCAD needs arrays formatted with specific syntax
+        function formatArrayForOpenSCAD(arr) {
+            if (Array.isArray(arr)) {
+                return `[${arr.map(item => {
+                    if (Array.isArray(item)) {
+                        return formatArrayForOpenSCAD(item);
+                    } else if (typeof item === 'string') {
+                        return `"${item}"`;
+                    } else {
+                        return item;
+                    }
+                }).join(',')}]`;
+            }
+            return arr;
+        }
+
         // Create a new SCAD file that imports the existing files and passes the button layout and params
         let scadContent = `
 include <${inputDeviceScad.replace(/\\/g, '/')}>
 include <${parametricButtonScad.replace(/\\/g, '/')}>
 
 // Button layout configuration
-button_layout=${JSON.stringify(buttonLayout)};
+button_layout = ${formatArrayForOpenSCAD(buttonLayout)};
 `;
 
         // Add button_params if provided
         if (buttonParams) {
             scadContent += `
 // Button parameters
-button_params=${JSON.stringify(buttonParams)};
+button_params = ${formatArrayForOpenSCAD(buttonParams)};
 `;
         }
 
-        // Call main function
-        scadContent += `
-// Call main function or module from your files
-main_assembly();
-`;
-
         // Write the combined SCAD code to file
-        await fs.writeFile(outputScadFile, scadContent);
+       // await fs.writeFile(outputScadFile, scadContent);
 
         console.log(`Combined SCAD file created at ${outputScadFile}`);
         console.log(`SCAD content: ${scadContent}`);
@@ -634,7 +645,7 @@ main_assembly();
             console.log(`Starting OpenSCAD conversion of ${outputScadFile} to ${stlFile}`);
 
             // Use --debug all flag to get more verbose output
-            const openScadCmd = `openscad --debug all -o "${stlFile}" "${outputScadFile}"`;
+            const openScadCmd = `openscad --debug all -q -o "${stlFile}" "${inputDeviceScad}" -D "button_layout=${formatArrayForOpenSCAD(buttonLayout)}" -D "button_params=${formatArrayForOpenSCAD(buttonParams)}"`;
             console.log(`Running command: ${openScadCmd}`);
 
             await new Promise((resolve, reject) => {
@@ -660,7 +671,7 @@ main_assembly();
                 setTimeout(() => {
                     process.kill();
                     reject(new Error('OpenSCAD operation timed out after 3 minutes'));
-                }, 480000); // 8 minute timeout
+                }, 1480000); // 3 minute timeout
             });
 
             // Check if STL file was created and has valid content
