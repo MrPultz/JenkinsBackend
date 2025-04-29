@@ -24,9 +24,9 @@ async function initializePrusaSlicerConfig() {
   }
 
   console.log('Initializing PrusaSlicer config...');
-  
+
   // Create default profiles
-  
+
   // Create a basic printer profile
   const basicPrinterConfig = `
 [printer_settings]
@@ -35,9 +35,9 @@ bed_shape = 0x0,250x0,250x210,0x210
 max_print_height = 220
 nozzle_diameter = 0.4
   `;
-  
+
   fs.writeFileSync(path.join(configDir, 'printer', 'ORIGINAL_PRUSA_MK4.ini'), basicPrinterConfig);
-  
+
   // Create a basic filament profile
   const basicFilamentConfig = `
 [filament_settings]
@@ -45,9 +45,9 @@ name = Prusament PLA
 temperature = 215
 bed_temperature = 60
   `;
-  
+
   fs.writeFileSync(path.join(configDir, 'filament', 'Prusament PLA.ini'), basicFilamentConfig);
-  
+
   // Create a basic print profile
   const basicPrintConfig = `
 [print_settings]
@@ -58,9 +58,9 @@ top_solid_layers = 5
 bottom_solid_layers = 5
 fill_density = 15%
   `;
-  
+
   fs.writeFileSync(path.join(configDir, 'print', '0.15mm SPEED.ini'), basicPrintConfig);
-  
+
   console.log('PrusaSlicer config initialized successfully with default profiles');
 }
 
@@ -70,7 +70,7 @@ function getPrinterProfiles() {
   if (!fs.existsSync(printerDir)) {
     return [];
   }
-  
+
   const printerFiles = fs.readdirSync(printerDir)
     .filter(file => file.endsWith('.ini'))
     .map(file => {
@@ -80,7 +80,7 @@ function getPrinterProfiles() {
       const name = nameMatch ? nameMatch[1].trim() : id;
       return { id, name };
     });
-  
+
   return printerFiles;
 }
 
@@ -90,7 +90,7 @@ function getFilamentProfiles() {
   if (!fs.existsSync(filamentDir)) {
     return [];
   }
-  
+
   const filamentFiles = fs.readdirSync(filamentDir)
     .filter(file => file.endsWith('.ini'))
     .map(file => {
@@ -100,7 +100,7 @@ function getFilamentProfiles() {
       const name = nameMatch ? nameMatch[1].trim() : id;
       return { id, name };
     });
-  
+
   return filamentFiles;
 }
 
@@ -110,7 +110,7 @@ function getPrintProfiles() {
   if (!fs.existsSync(printDir)) {
     return [];
   }
-  
+
   const printFiles = fs.readdirSync(printDir)
     .filter(file => file.endsWith('.ini'))
     .map(file => {
@@ -120,7 +120,7 @@ function getPrintProfiles() {
       const name = nameMatch ? nameMatch[1].trim() : id;
       return { id, name };
     });
-  
+
   return printFiles;
 }
 
@@ -129,8 +129,32 @@ function getSliceCommand(stlFilePath, gcodeFilePath, printerProfile, filamentPro
   const printerIniPath = path.join(configDir, 'printer', `${printerProfile}.ini`);
   const filamentIniPath = path.join(configDir, 'filament', `${filamentProfile}.ini`);
   const printIniPath = path.join(configDir, 'print', `${printProfile}.ini`);
-  
-  return `prusa-slicer-console --datadir "${configDir}" --export-gcode --load "${printerIniPath}" --load "${filamentIniPath}" --load "${printIniPath}" --output "${gcodeFilePath}" "${stlFilePath}"`;
+
+  // Define paths to try for PrusaSlicer
+  const prusaSlicerPaths = [
+    'C:\\Program Files\\Prusa3D\\PrusaSlicer\\prusa-slicer-console.exe',
+    'C:\\Program Files\\PrusaSlicer\\prusa-slicer-console.exe',
+    'C:\\Program Files (x86)\\Prusa3D\\PrusaSlicer\\prusa-slicer-console.exe',
+    // If console version not found, try the GUI version
+    'C:\\Program Files\\Prusa3D\\PrusaSlicer\\PrusaSlicer.exe',
+    'C:\\Program Files\\PrusaSlicer\\PrusaSlicer.exe',
+    'C:\\Program Files (x86)\\Prusa3D\\PrusaSlicer\\PrusaSlicer.exe',
+    // Try the command directly as a last resort
+    'prusa-slicer-console'
+  ];
+
+  // Use the first path that exists, or default to the last one
+  let prusaSlicerPath = prusaSlicerPaths[prusaSlicerPaths.length - 1];
+  for (const testPath of prusaSlicerPaths) {
+    if (fs.existsSync(testPath)) {
+      prusaSlicerPath = testPath;
+      break;
+    }
+  }
+
+  console.log(`Using PrusaSlicer at: ${prusaSlicerPath}`);
+
+  return `"${prusaSlicerPath}" --datadir "${configDir}" --export-gcode --load "${printerIniPath}" --load "${filamentIniPath}" --load "${printIniPath}" --output "${gcodeFilePath}" "${stlFilePath}"`;
 }
 
 module.exports = {

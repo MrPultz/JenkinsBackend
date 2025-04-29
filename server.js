@@ -173,41 +173,58 @@ app.post('/api/convert-scad-to-stl', async (req, res) => {
     }
 });
 
-// Endpoint to convert stl to G-code using PrusaSlicer
+// Endpoint to convert stl to G-code using PrusaSlicer - fixed version
 app.post('/api/convert-stl-to-gcode', upload.single('stlFile'), async (req, res) => {
-    try {
-        const stlFilePath = req.file?.path;
+    let tempFiles = [];
 
-        if(!stlFilePath) {
-            return res.status(400).json({ error: 'STL file is required' });
+    try {
+        console.log('File upload request received');
+        console.log('Request body:', req.body);
+        console.log('Request file:', req.file);
+
+        // Check if file was uploaded
+        let stlFilePath;
+
+        if (req.file?.path) {
+            stlFilePath = req.file.path;
+            console.log(`STL file received at ${stlFilePath}`);
+        } else {
+            return res.status(400).json({ error: 'STL file is required. Make sure to use field name "stlFile".' });
         }
 
+        tempFiles.push(stlFilePath);
+
         // Get printer type and other settings from request
-        const printerType = req.body.printerType || 'ORIGINAL_PRUSA_MK4'; // Default to Prusa MK4
-        const filementType = req.body.filementType || 'Prusament PLA'; // Default to PLA
-        const qualityPorfile = req.body.qualityPorfile || '0.15mm SPEED'; // Default to 0.15mm SPEED
+        const printerType = req.body.printerType || 'ORIGINAL_PRUSA_MK4';
+        const filamentType = req.body.filamentType || 'Prusament PLA';
+        const qualityProfile = req.body.qualityProfile || '0.15mm SPEED';
+
+        console.log(`Using printer: ${printerType}, filament: ${filamentType}, quality: ${qualityProfile}`);
 
         // Generate unique ID for the conversion
         const uniqueID = crypto.randomBytes(8).toString('hex');
         const gcodeFile = path.join(tempDir, `${uniqueID}.gcode`);
+        tempFiles.push(gcodeFile);
 
         // Execute PrusaSlicer to convert STL to G-code using the config helper
         try {
-            const sliceCommand = config.getSliceCommand(stlFilePath, gcodeFile, printerType, filementType, qualityPorfile);
+            const sliceCommand = config.getSliceCommand(stlFilePath, gcodeFile, printerType, filamentType, qualityProfile);
+            console.log(`Executing slice command: ${sliceCommand}`);
 
             await new Promise((resolve, reject) => {
                 exec(sliceCommand, (error, stdout, stderr) => {
-                    if(error) {
+                    if (error) {
+                        console.error('PrusaSlicer error:', stderr);
                         reject(error);
                         return;
                     } else {
                         resolve(stdout);
                     }
                 });
-        });
+            });
 
             // Check if G-code file was created
-            if(!fs.existsSync(gcodeFile)) {
+            if (!fs.existsSync(gcodeFile)) {
                 throw new Error('G-code file not created');
             }
 
@@ -218,22 +235,188 @@ app.post('/api/convert-stl-to-gcode', upload.single('stlFile'), async (req, res)
             res.setHeader('Content-Disposition', 'attachment; filename="model.gcode"');
             res.send(gcodeContent);
 
-            // Clean up files after sending response
-            setTimeout(() => {
-                fs.unlink(stlFilePath, err => {
-                    if(err) return console.error('Error deleting STL file:', err);
-                });
-                fs.unlink(gcodeFile, err => {
-                    if(err) return console.error('Error deleting G-code file:', err);
-                });
-            }, 1000);
-        } catch(err) {
+            console.log(`G-code file successfully sent to client`);
+
+        } catch (err) {
             console.error('Error converting STL to G-code:', err);
-            res.status(500).json({ error: 'Conversion failed', details: err.message });
+
+            if (!res.headersSent) {
+                res.status(500).json({ error: 'Conversion failed', details: err.message });
+            }
         }
-    } catch(err) {
-        console.error('Error converting STL to G-code:', err);
-        res.status(500).json({ error: 'Conversion failed', details: err.message });
+    } catch (err) {
+        console.error('Error processing STL:', err);
+
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Processing failed', details: err.message });
+        }
+    } finally {
+        // Clean up all temporary files
+        setTimeout(() => {
+            tempFiles.forEach(file => {
+                if (fs.existsSync(file)) {
+                    fs.unlink(file, err => {
+                        if (err) console.error(`Error deleting file ${file}:`, err);
+                    });
+                }
+            });
+        }, 1000);
+    }
+});
+
+// Endpoint to handle STL data directly
+app.post('/api/process-stl', async (req, res) => {
+    let tempFiles = [];
+
+    try {
+        let stlFilePath;
+        let stlData;
+
+        console.log('Request headers:', req.headers['content-type']);
+        console.log('Request received for process-stl');
+
+        // Handle form-data with stl field (multipart/form-data)
+        if (req.headers['content-type']?.includes('multipart/form-data')) {
+            // Use multer to process the uploaded file
+            upload.single('stl')(req, res, async function(err) {
+                if (err) {
+                    console.error('Error in Multer upload:', err);
+                    return res.status(400).json({ error: 'File upload failed', details: err.message });
+                }
+
+                if (!req.file) {
+                    console.error('No file received in multipart/form-data');
+                    return res.status(400).json({ error: 'STL file is required. Make sure to use field name "stl".' });
+                }
+
+                stlFilePath = req.file.path;
+                console.log(`STL file received through multipart/form-data at ${stlFilePath}`);
+                tempFiles.push(stlFilePath);
+
+                // Continue with processing the STL file
+                try {
+                    await processSTLFile();
+                } catch (processErr) {
+                    console.error('Error in STL processing:', processErr);
+                    // Error handling is done inside processSTLFile
+                }
+            });
+            return; // This early return allows the async function in upload.single to finish
+        }
+        // Check if we're receiving raw STL data in the body
+        else if (req.headers['content-type'] === 'application/octet-stream') {
+            // Handle binary STL data directly
+            stlData = req.body;
+            const uniqueID = crypto.randomBytes(8).toString('hex');
+            stlFilePath = path.join(tempDir, `${uniqueID}.stl`);
+            await fs.writeFile(stlFilePath, stlData);
+            tempFiles.push(stlFilePath);
+            console.log(`Received raw STL data, saved to ${stlFilePath}`);
+        }
+        // Check if we're receiving base64 encoded STL
+        else if (req.body.stlBase64) {
+            const stlBuffer = Buffer.from(req.body.stlBase64, 'base64');
+            const uniqueID = crypto.randomBytes(8).toString('hex');
+            stlFilePath = path.join(tempDir, `${uniqueID}.stl`);
+            await fs.writeFile(stlFilePath, stlBuffer);
+            tempFiles.push(stlFilePath);
+            console.log(`Received base64 encoded STL data, saved to ${stlFilePath}`);
+        }
+        // Check if we're receiving a field called 'stl' in JSON format
+        else if (req.body.stl) {
+            let stlBuffer;
+            if (typeof req.body.stl === 'string') {
+                // If it's a base64 string
+                stlBuffer = Buffer.from(req.body.stl, 'base64');
+            } else {
+                // If it's an object or array, stringify it
+                stlBuffer = Buffer.from(JSON.stringify(req.body.stl));
+            }
+            const uniqueID = crypto.randomBytes(8).toString('hex');
+            stlFilePath = path.join(tempDir, `${uniqueID}.stl`);
+            await fs.writeFile(stlFilePath, stlBuffer);
+            tempFiles.push(stlFilePath);
+            console.log(`Received JSON stl data, saved to ${stlFilePath}`);
+        }
+        // If no STL data was found
+        else {
+            console.error('No STL data found in request:', req.body);
+            return res.status(400).json({ error: 'No STL data provided. Please send STL data in correct format.' });
+        }
+
+        // Function to process the STL file and generate G-code
+        async function processSTLFile() {
+            // Get printer type and other settings from request
+            const printerType = req.body.printerType || 'ORIGINAL_PRUSA_MK4'; // Default to Prusa MK4
+            const filamentType = req.body.filamentType || 'Prusament PLA'; // Default to PLA
+            const qualityProfile = req.body.qualityProfile || '0.15mm SPEED'; // Default to 0.15mm SPEED
+
+            // Generate unique ID for the gcode file
+            const uniqueID = crypto.randomBytes(8).toString('hex');
+            const gcodeFile = path.join(tempDir, `${uniqueID}.gcode`);
+            tempFiles.push(gcodeFile);
+
+            try {
+                const sliceCommand = config.getSliceCommand(stlFilePath, gcodeFile, printerType, filamentType, qualityProfile);
+                console.log(`Executing slice command: ${sliceCommand}`);
+
+                await new Promise((resolve, reject) => {
+                    exec(sliceCommand, (error, stdout, stderr) => {
+                        if (error) {
+                            console.error('PrusaSlicer error:', stderr);
+                            reject(error);
+                            return;
+                        } else {
+                            resolve(stdout);
+                        }
+                    });
+                });
+
+                // Check if G-code file was created
+                if (!fs.existsSync(gcodeFile)) {
+                    throw new Error('G-code file not created');
+                }
+
+                // Send G-code file
+                const gcodeContent = await fs.readFile(gcodeFile);
+
+                res.setHeader('Content-Type', 'application/octet-stream');
+                res.setHeader('Content-Disposition', 'attachment; filename="model.gcode"');
+                res.send(gcodeContent);
+
+                console.log(`G-code file successfully sent to client`);
+
+            } catch (err) {
+                console.error('Error converting STL to G-code:', err);
+
+                if (!res.headersSent) {
+                    res.status(500).json({ error: 'Conversion failed', details: err.message });
+                }
+            } finally {
+                // Clean up all temporary files
+                setTimeout(() => {
+                    tempFiles.forEach(file => {
+                        if (fs.existsSync(file)) {
+                            fs.unlink(file, err => {
+                                if (err) console.error(`Error deleting file ${file}:`, err);
+                            });
+                        }
+                    });
+                }, 1000);
+            }
+        }
+
+        // If we're not using multer (for non-multipart requests), process the STL file now
+        if (stlFilePath && !req.headers['content-type']?.includes('multipart/form-data')) {
+            await processSTLFile();
+        }
+
+    } catch (err) {
+        console.error('Error processing STL data:', err);
+
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Processing failed', details: err.message });
+        }
     }
 });
 
@@ -564,3 +747,9 @@ main_assembly();
 app.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
 });
+
+const prusaSlicerPaths = [
+  config.PRUSA_SLICER_PATH, // Read from environment
+  'C:\\Program Files\\Prusa3D\\PrusaSlicer\\prusa-slicer-console.exe',
+  // ...other paths...
+].filter(Boolean); // Remove any undefined entries
