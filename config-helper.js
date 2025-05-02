@@ -130,26 +130,10 @@ function getSliceCommand(stlFilePath, gcodeFilePath, printerProfile, filamentPro
   const filamentIniPath = path.join(configDir, 'filament', `${filamentProfile}.ini`);
   const printIniPath = path.join(configDir, 'print', `${printProfile}.ini`);
 
-  // Define paths to try for PrusaSlicer
-  const prusaSlicerPaths = [
-    'C:\\Program Files\\Prusa3D\\PrusaSlicer\\prusa-slicer-console.exe',
-    'C:\\Program Files\\PrusaSlicer\\prusa-slicer-console.exe',
-    'C:\\Program Files (x86)\\Prusa3D\\PrusaSlicer\\prusa-slicer-console.exe',
-    // If console version not found, try the GUI version
-    'C:\\Program Files\\Prusa3D\\PrusaSlicer\\PrusaSlicer.exe',
-    'C:\\Program Files\\PrusaSlicer\\PrusaSlicer.exe',
-    'C:\\Program Files (x86)\\Prusa3D\\PrusaSlicer\\PrusaSlicer.exe',
-    // Try the command directly as a last resort
-    'prusa-slicer-console'
-  ];
+  const prusaSlicerPath = findPrusaSlicerExecutable();
 
-  // Use the first path that exists, or default to the last one
-  let prusaSlicerPath = prusaSlicerPaths[prusaSlicerPaths.length - 1];
-  for (const testPath of prusaSlicerPaths) {
-    if (fs.existsSync(testPath)) {
-      prusaSlicerPath = testPath;
-      break;
-    }
+  if (!prusaSlicerPath) {
+    throw new Error('PrusaSlicer executable not found');
   }
 
   console.log(`Using PrusaSlicer at: ${prusaSlicerPath}`);
@@ -157,10 +141,60 @@ function getSliceCommand(stlFilePath, gcodeFilePath, printerProfile, filamentPro
   return `"${prusaSlicerPath}" --datadir "${configDir}" --export-gcode --load "${printerIniPath}" --load "${filamentIniPath}" --load "${printIniPath}" --output "${gcodeFilePath}" "${stlFilePath}"`;
 }
 
+// Function to find PrusaSlicer executable
+function findPrusaSlicerExecutable() {
+  // List of possible paths where PrusaSlicer might be installed
+  const possibleExecutables = ['prusa-slicer-console.exe', 'prusa-slicer.exe'];
+  const prusaSlicerBasePaths = [
+    process.env.PRUSA_SLICER_PATH, // From environment variable if set
+    'C:\\Program Files\\Prusa3D\\PrusaSlicer',
+    'C:\\Program Files (x86)\\Prusa3D\\PrusaSlicer',
+    'C:\\Program Files\\PrusaSlicer',
+    'C:\\Program Files (x86)\\PrusaSlicer',
+    // Add other potential paths here
+  ];
+
+  // Try all combinations of paths and executables
+  for (const basePath of prusaSlicerBasePaths) {
+    if (!basePath) continue;
+    
+    for (const exeName of possibleExecutables) {
+      const fullPath = path.join(basePath, exeName);
+      if (fs.existsSync(fullPath)) {
+        return fullPath;
+      }
+    }
+  }
+
+  // If we couldn't find PrusaSlicer in any of the predefined paths,
+  // try to find it using the 'where' command on Windows
+  try {
+    for (const exeName of possibleExecutables) {
+      try {
+        const whichOutput = require('child_process').execSync(`where ${exeName}`).toString().trim();
+        if (whichOutput && fs.existsSync(whichOutput.split('\n')[0])) {
+          return whichOutput.split('\n')[0];
+        }
+      } catch (e) {
+        // This specific executable wasn't found in PATH, try the next one
+      }
+    }
+  } catch (err) {
+    // 'where' command failed, PrusaSlicer is not in PATH
+    console.warn('PrusaSlicer not found in PATH');
+  }
+
+  // Could not find PrusaSlicer executable
+  console.error('PrusaSlicer executable not found');
+  return null;
+}
+
 module.exports = {
   initializePrusaSlicerConfig,
   getPrinterProfiles,
   getFilamentProfiles,
   getPrintProfiles,
-  getSliceCommand
+  getSliceCommand,
+  findPrusaSlicerExecutable,
+  // other existing exports...
 };

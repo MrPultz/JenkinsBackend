@@ -7,6 +7,15 @@ const { exec } = require('child_process');
 const crypto = require('crypto');
 const multer = require('multer');
 const config = require('./config-helper');
+const axios = require('axios');
+const FormData = require('form-data');
+require('dotenv').config(); // Load environment variables from .env file
+
+// Add this near the beginning of your file, after loading dotenv
+// Check required environment variables
+if (!process.env.PRUSA_CONNECT_API_TOKEN) {
+    console.warn('Warning: PRUSA_CONNECT_API_TOKEN environment variable not set. Prusa Connect endpoints will not function.');
+}
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -742,6 +751,527 @@ button_params = ${formatArrayForOpenSCAD(buttonParams)};
         }
     } finally {
         // Clean up all temporary files
+        setTimeout(() => {
+            tempFiles.forEach(file => {
+                if (fs.existsSync(file)) {
+                    fs.unlink(file, err => {
+                        if (err) console.error(`Error deleting file ${file}:`, err);
+                    });
+                }
+            });
+        }, 1000);
+    }
+});
+
+// Endpoint to slice and start printing via Prusa Connect
+app.post('/api/print-via-prusa-connect', upload.single('stlFile'), async (req, res) => {
+    let tempFiles = [];
+
+    try {
+        console.log('Print via Prusa Connect request received');
+        
+        // Get STL file path - either from uploaded file or use placeholder
+        let stlFilePath;
+        if (req.file?.path) {
+            stlFilePath = req.file.path;
+            console.log(`STL file received at ${stlFilePath}`);
+            tempFiles.push(stlFilePath);
+        } else {
+            // Use placeholder file if no file was uploaded
+            stlFilePath = path.join(__dirname, 'assets', 'placeholder.stl');
+            console.log(`Using placeholder STL file at ${stlFilePath}`);
+            
+            // Check if placeholder exists
+            if (!fs.existsSync(stlFilePath)) {
+                // Create assets directory if it doesn't exist
+                const assetsDir = path.join(__dirname, 'assets');
+                if (!fs.existsSync(assetsDir)) {
+                    fs.mkdirSync(assetsDir, { recursive: true });
+                    console.log(`Created assets directory at ${assetsDir}`);
+                }
+                
+                return res.status(400).json({ 
+                    error: 'No STL file provided and placeholder file not found. Please upload an STL file or create a placeholder.stl file in the assets directory.' 
+                });
+            }
+        }
+
+        // Get printer and slicing settings
+        const printerName = req.body.printerName || 'MK4 Master Thesis';
+        const printerType = req.body.printerType || 'ORIGINAL_PRUSA_MK4';
+        const filamentType = req.body.filamentType || 'Prusament PLA';
+        const qualityProfile = req.body.qualityProfile || '0.15mm SPEED';
+        
+        // Prusa Connect API credentials from environment variables
+        const PRUSA_CONNECT_API_TOKEN = process.env.PRUSA_CONNECT_API_TOKEN;
+        
+        // Use the API URL that we found working
+        const PRUSA_CONNECT_API_URL = 'https://connect.prusa3d.com/api';
+        
+        if (!PRUSA_CONNECT_API_TOKEN) {
+            console.error('PRUSA_CONNECT_API_TOKEN environment variable not set');
+            return res.status(500).json({ 
+                error: 'Prusa Connect API token not configured. Please set the PRUSA_CONNECT_API_TOKEN environment variable.' 
+            });
+        }
+
+        // First, we need to get the printer ID for the specified printer
+        let printerID;
+        try {
+            console.log(`Fetching printers from ${PRUSA_CONNECT_API_URL}/printer`);
+            
+            const printersResponse = await axios.get(`${PRUSA_CONNECT_API_URL}/printer`, {
+                headers: {
+                    'Authorization': `Bearer ${PRUSA_CONNECT_API_TOKEN}`
+                }
+            });
+            
+            console.log('Prusa Connect API response received');
+            
+            // Check if the response data structure is as expected
+            if (!printersResponse.data || !printersResponse.data.printers) {
+                console.error('Unexpected API response format:', JSON.stringify(printersResponse.data, null, 2));
+                return res.status(500).json({ 
+                    error: 'Unexpected response format from Prusa Connect API',
+                    response: printersResponse.data
+                });
+            }
+            
+            // Log available printers for debugging
+            console.log('Available printers:', printersResponse.data.printers.map(p => p.name));
+            
+            const printer = printersResponse.data.printers.find(p => 
+                p.name === printerName || p.name.includes(printerName)
+            );
+            
+            if (!printer) {
+                return res.status(404).json({ 
+                    error: `Printer "${printerName}" not found in your Prusa Connect account`,
+                    availablePrinters: printersResponse.data.printers.map(p => p.name),
+                    message: 'Please check the printer name or update the printerName parameter to match one of the available printers.'
+                });
+            }
+            
+            printerID = printer.id;
+            console.log(`Found printer "${printer.name}" with ID: ${printerID}`);
+            
+        } catch (err) {
+            console.error('Error fetching printers from Prusa Connect:', err);
+            
+            // Log more detailed error information
+            if (err.response) {
+                console.error('API error response:', {
+                    status: err.response.status,
+                    data: err.response.data,
+                    headers: err.response.headers
+                });
+                
+                // Handle specific error codes
+                if (err.response.status === 401) {
+                    return res.status(401).json({
+                        error: 'Authentication failed. Your Prusa Connect API token may be invalid or expired.',
+                        details: err.response.data
+                    });
+                } else if (err.response.status === 404) {
+                    return res.status(404).json({
+                        error: 'API endpoint not found. The Prusa Connect API URL may have changed.',
+                        details: err.response.data
+                    });
+                }
+            } else if (err.request) {
+                console.error('No response received:', err.request);
+                
+                return res.status(503).json({
+                    error: 'No response received from Prusa Connect API. The service may be down or unavailable.',
+                    details: 'Network request was sent but no response was received'
+                });
+            }
+            
+            return res.status(500).json({ 
+                error: 'Failed to connect to Prusa Connect API', 
+                details: err.message 
+            });
+        }
+        
+        // Upload the STL file to Prusa Connect
+        let uploadResponse;
+        try {
+            console.log(`Uploading STL file to printer ${printerID}`);
+            
+            const formData = new FormData();
+            formData.append('file', fs.createReadStream(stlFilePath), {
+                filename: path.basename(stlFilePath),
+                contentType: 'application/sla'
+            });
+            
+            uploadResponse = await axios.post(
+                `${PRUSA_CONNECT_API_URL}/printers/${printerID}/files`, 
+                formData,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${PRUSA_CONNECT_API_TOKEN}`,
+                        ...formData.getHeaders()
+                    },
+                    maxContentLength: Infinity,
+                    maxBodyLength: Infinity
+                }
+            );
+            
+            console.log('File uploaded successfully to Prusa Connect');
+            
+        } catch (err) {
+            console.error('Error uploading file to Prusa Connect:', err);
+            
+            if (err.response) {
+                console.error('Upload error response:', {
+                    status: err.response.status,
+                    data: err.response.data
+                });
+                
+                // Handle specific error codes for upload
+                if (err.response.status === 413) {
+                    return res.status(413).json({
+                        error: 'File too large for Prusa Connect API',
+                        details: err.response.data
+                    });
+                }
+            }
+            
+            return res.status(500).json({ 
+                error: 'Failed to upload file to Prusa Connect', 
+                details: err.message 
+            });
+        }
+        
+        // Get file ID and name from the upload response
+        let fileID, fileName;
+        
+        try {
+            fileID = uploadResponse.data.id;
+            fileName = uploadResponse.data.name;
+            
+            console.log(`File uploaded with ID: ${fileID}, name: ${fileName}`);
+            
+            if (!fileID) {
+                throw new Error('File ID missing from upload response');
+            }
+        } catch (err) {
+            console.error('Error parsing upload response:', err);
+            console.error('Upload response data:', uploadResponse.data);
+            
+            return res.status(500).json({
+                error: 'Failed to get file ID from upload response',
+                details: err.message,
+                responseData: uploadResponse.data
+            });
+        }
+        
+        // Start slicing and printing the file
+        try {
+            console.log(`Starting slice-and-print operation for file ${fileID}`);
+            
+            // Prepare the slice and print request payload
+            const sliceAndPrintPayload = {
+                file_id: fileID,
+                printer_profile: printerType,
+                filament_profile: filamentType,
+                print_profile: qualityProfile
+            };
+            
+            console.log('Slice and print payload:', sliceAndPrintPayload);
+            
+            // Request slicing with the specified parameters
+            const printResponse = await axios.post(
+                `${PRUSA_CONNECT_API_URL}/printers/${printerID}/slice-and-print`, 
+                sliceAndPrintPayload,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${PRUSA_CONNECT_API_TOKEN}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+            
+            console.log(`File "${fileName}" slicing and printing started on printer "${printerName}"`);
+            console.log('Print response:', printResponse.data);
+            
+            return res.status(200).json({ 
+                message: `Print job started on ${printerName}`,
+                printer: printerName,
+                file: fileName,
+                printer_id: printerID,
+                file_id: fileID,
+                print_response: printResponse.data
+            });
+            
+        } catch (err) {
+            console.error('Error starting print job on Prusa Connect:', err);
+            
+            if (err.response) {
+                console.error('Print error response:', {
+                    status: err.response.status,
+                    data: err.response.data
+                });
+            }
+            
+            return res.status(500).json({ 
+                error: 'Failed to start print job on Prusa Connect', 
+                details: err.message,
+                response: err.response?.data
+            });
+        }
+        
+    } catch (err) {
+        console.error('Error in Prusa Connect print process:', err);
+        
+        if (!res.headersSent) {
+            res.status(500).json({ 
+                error: 'Print process failed', 
+                details: err.message 
+            });
+        }
+    } finally {
+        // Clean up temporary files
+        setTimeout(() => {
+            tempFiles.forEach(file => {
+                if (fs.existsSync(file)) {
+                    fs.unlink(file, err => {
+                        if (err) console.error(`Error deleting file ${file}:`, err);
+                    });
+                }
+            });
+        }, 1000);
+    }
+});
+
+// Endpoint to test Prusa Connect API connection
+app.get('/api/test-prusa-connect', async (req, res) => {
+    try {
+        const PRUSA_CONNECT_API_TOKEN = process.env.PRUSA_CONNECT_API_TOKEN;
+        
+        if (!PRUSA_CONNECT_API_TOKEN) {
+            return res.status(500).json({ 
+                error: 'Prusa Connect API token not configured. Please set the PRUSA_CONNECT_API_TOKEN environment variable.' 
+            });
+        }
+        
+        // Try different API URLs
+        const possibleApiUrls = [
+            'https://connect.prusa3d.com/c/api',
+            'https://connect.prusa3d.com/',
+            'https://connect.prusa3d.com/api'
+        ];
+        
+        let successful = false;
+        let responseData = null;
+        let error = null;
+        
+        for (const apiUrl of possibleApiUrls) {
+            try {
+                console.log(`Testing Prusa Connect API URL: ${apiUrl}`);
+                
+                const response = await axios.get(`${apiUrl}/printers`, {
+                    headers: {
+                        'Authorization': `Bearer ${PRUSA_CONNECT_API_TOKEN}`
+                    }
+                });
+                
+                successful = true;
+                responseData = response.data;
+                console.log('API test successful with URL:', apiUrl);
+                break;
+            } catch (err) {
+                error = err;
+                console.error(`API test failed with URL ${apiUrl}:`, err.message);
+            }
+        }
+        
+        if (successful) {
+            return res.status(200).json({
+                message: 'Successfully connected to Prusa Connect API',
+                data: responseData
+            });
+        } else {
+            return res.status(500).json({
+                error: 'Failed to connect to Prusa Connect API with all possible URLs',
+                details: error.message
+            });
+        }
+    } catch (err) {
+        console.error('Error testing Prusa Connect API:', err);
+        
+        return res.status(500).json({
+            error: 'Test failed',
+            details: err.message
+        });
+    }
+});
+
+// Endpoint to slice and directly send to printer using PrusaSlicer
+app.post('/api/slice-and-print-direct', upload.single('stlFile'), async (req, res) => {
+    let tempFiles = [];
+
+    try {
+        console.log('Slice and print direct request received');
+        
+        // Get STL file path - either from uploaded file or use placeholder
+        let stlFilePath;
+        if (req.file?.path) {
+            stlFilePath = req.file.path;
+            console.log(`STL file received at ${stlFilePath}`);
+            tempFiles.push(stlFilePath);
+        } else {
+            // Use placeholder file if no file was uploaded
+            stlFilePath = path.join(__dirname, 'assets', 'placeholder.stl');
+            console.log(`Using placeholder STL file at ${stlFilePath}`);
+            
+            // Check if placeholder exists
+            if (!fs.existsSync(stlFilePath)) {
+                // Create assets directory if it doesn't exist
+                const assetsDir = path.join(__dirname, 'assets');
+                if (!fs.existsSync(assetsDir)) {
+                    fs.mkdirSync(assetsDir, { recursive: true });
+                    console.log(`Created assets directory at ${assetsDir}`);
+                }
+                
+                return res.status(400).json({ 
+                    error: 'No STL file provided and placeholder file not found. Please upload an STL file or create a placeholder.stl file in the assets directory.' 
+                });
+            }
+        }
+
+        // Get printer and slicing settings
+        // Use the full printer preset name as configured in PrusaSlicer
+        const printerPreset = req.body.printerPreset || 'MK4 Master Thesis * Original Prusa MK4 Input Shaper 0.4 nozzle';
+        const filamentType = req.body.filamentType || 'Prusament PLA';
+        const qualityProfile = req.body.qualityProfile || '0.15mm SPEED';
+        
+        // Generate a temp gcode file path
+        const uniqueID = crypto.randomBytes(8).toString('hex');
+        const gcodeFilePath = path.join(tempDir, `${uniqueID}.gcode`);
+        tempFiles.push(gcodeFilePath);
+        
+        // Find the PrusaSlicer executable
+        const prusaSlicerPath = config.findPrusaSlicerExecutable();
+        if (!prusaSlicerPath) {
+            return res.status(500).json({ 
+                error: 'PrusaSlicer executable not found. Please make sure PrusaSlicer is installed correctly.' 
+            });
+        }
+        
+        console.log(`Using PrusaSlicer at: ${prusaSlicerPath}`);
+        
+        try {
+            // PrusaSlicer command using the complete preset name
+            // Format: prusa-slicer-console --export-gcode --printer "printer_preset" --filament "filament_preset" --print "print_preset" --output "output.gcode" "input.stl"
+            const sliceAndPrintCmd = `"${prusaSlicerPath}" --export-gcode --printer "${printerPreset}" --filament "${filamentType}" --print "${qualityProfile}" --output "${gcodeFilePath}" "${stlFilePath}"`;
+            
+            console.log(`Executing slice and print command: ${sliceAndPrintCmd}`);
+            
+            // Execute PrusaSlicer to slice the model
+            await new Promise((resolve, reject) => {
+                exec(sliceAndPrintCmd, {maxBuffer: 5 * 1024 * 1024}, (error, stdout, stderr) => {
+                    if (error) {
+                        console.error('PrusaSlicer error output:', stderr);
+                        reject(error);
+                    } else {
+                        console.log('PrusaSlicer stdout:', stdout);
+                        resolve(stdout);
+                    }
+                });
+            });
+            
+            // Check if G-code file was created
+            if (!fs.existsSync(gcodeFilePath)) {
+                throw new Error('G-code file not created. PrusaSlicer failed to slice the model.');
+            }
+            
+            // Now we need to send the G-code file to the printer
+            // This can be done using PrusaSlicer's built-in upload command, OS print commands,
+            // or by returning the G-code file for the frontend to handle
+            
+            // For this example, we'll use PrusaSlicer's built-in upload functionality if available
+            // Otherwise, we'll return the G-code file to the client
+            
+            try {
+                // Create a command to upload to printer using PrusaSlicer
+                // Note: This might not be supported in all versions, so we'll have a fallback
+                const uploadCmd = `"${prusaSlicerPath}" --upload "${gcodeFilePath}" --printer "${printerPreset}"`;
+                
+                console.log(`Attempting to upload directly to printer with command: ${uploadCmd}`);
+                
+                await new Promise((resolve, reject) => {
+                    exec(uploadCmd, {maxBuffer: 5 * 1024 * 1024}, (error, stdout, stderr) => {
+                        if (error) {
+                            console.warn('Direct upload to printer failed, will return G-code file instead:', stderr);
+                            resolve(false); // Continue execution but indicate failure
+                        } else {
+                            console.log('Upload to printer succeeded:', stdout);
+                            resolve(true);
+                        }
+                    });
+                });
+                
+                // If we reach here, the command ran but might have failed
+                // Let's check if the G-code file still exists (if it was successfully sent, some versions delete it)
+                const fileStillExists = fs.existsSync(gcodeFilePath);
+                
+                if (!fileStillExists) {
+                    console.log('G-code file was removed, assuming successful upload to printer');
+                    
+                    return res.status(200).json({ 
+                        message: `Print job successfully sent to printer "${printerPreset}"`,
+                        printer: printerPreset,
+                        file: path.basename(stlFilePath),
+                        method: 'direct_upload'
+                    });
+                } else {
+                    console.log('G-code file still exists, sending to client for manual printing');
+                    
+                    // Read the G-code file content
+                    const gcodeContent = await fs.readFile(gcodeFilePath);
+                    
+                    // Send the G-code file to the client
+                    res.setHeader('Content-Type', 'application/octet-stream');
+                    res.setHeader('Content-Disposition', `attachment; filename="${printerPreset}_${path.basename(stlFilePath, '.stl')}.gcode"`);
+                    res.send(gcodeContent);
+                    
+                    console.log(`G-code file sent to client for manual upload to printer`);
+                }
+                
+            } catch (uploadErr) {
+                console.error('Error during printer upload attempt:', uploadErr);
+                
+                // Fall back to sending the G-code file to the client
+                const gcodeContent = await fs.readFile(gcodeFilePath);
+                
+                res.setHeader('Content-Type', 'application/octet-stream');
+                res.setHeader('Content-Disposition', `attachment; filename="${printerPreset}_${path.basename(stlFilePath, '.stl')}.gcode"`);
+                res.send(gcodeContent);
+                
+                console.log(`G-code file sent to client as fallback`);
+            }
+            
+        } catch (err) {
+            console.error('Error slicing and sending to printer:', err);
+            
+            return res.status(500).json({ 
+                error: 'Failed to slice and send to printer', 
+                details: err.message
+            });
+        }
+        
+    } catch (err) {
+        console.error('Error in direct print process:', err);
+        
+        if (!res.headersSent) {
+            res.status(500).json({ 
+                error: 'Print process failed', 
+                details: err.message 
+            });
+        }
+    } finally {
+        // Clean up temporary files
         setTimeout(() => {
             tempFiles.forEach(file => {
                 if (fs.existsSync(file)) {
