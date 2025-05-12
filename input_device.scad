@@ -21,7 +21,7 @@ DEFAULT_LIP_CLEARANCE = 0.25;
 // Button scaling (affects only visual size of button in preview)
 BUTTON_VISUAL_SCALE = 1;
 // Show assembled view
-SHOW_ASSEMBLED = true;
+SHOW_ASSEMBLED = false;
 // Show button cutouts in top plate
 SHOW_CUTOUTS = true;
 // Show actual buttons 
@@ -35,20 +35,17 @@ ASSEMBLY_GAP = 10;
 
 // Use either a supplied layout or one of the built-in layout functions
 // Button parameters = [x, y, size, size2], leaving size2 empty will use size as the button size
-button_layout = [
-    [0, 22, 18, 30],    // W key (center, top)
-    [-22, 0, 18],   // A key (left, center)
-    [0, 0, 18],     // S key (center, center)
-    [22, 0, 18]     // D key (right, center)
-    
-];
+button_layout = [[-19,38,18,0],[0,38,18,0],[19,38,18,0],[38,38,18,0],[-19,19,18,0],[0,19,18,0],[19,19,18,0],[38,19,18,18],[-19,0,18,0],[0,0,18,0],[19,0,18,0],[-19,-19,18,0],[0,-19,18,0],[19,-19,18,0],[38,0,18,18],[-9.5,-38,18,37],[19,-38,18,0]];
 
 //3x3 keyboard layout
 ThreexLayout = [
-  [0, 35, 20],    // Top center button [x, y, size]
-  [-35, -15, 20], // Bottom left button
-  [0, -15, 20],   // Bottom center button
-  [35, -15, 20]   // Bottom right button
+  // W key (centered above S)
+    [0, 19, 18],
+    
+    // A, S, D keys (horizontal row)
+    [-19, 0, 18],  // A key
+    [0, 0, 18],    // S key
+    [19, 0, 18]   // D key
 ];
 
 keyboard_layout = [
@@ -86,18 +83,7 @@ keyboard_layout = [
 // Use 0 for case_width and case_depth to auto-size
 
 button_params = 
-[
-    0, //case_width
-    0, //case_depth
-    2.5, //wall_thickness
-    2, //corner_radius
-    2, //top_thickness
-    18, //button_size
-    8, //edge_margin
-    2, //lip_height
-    0.1, //lip_clearance
-    6 //case_height
-];
+[0,0,2.5,2,2,18,8,2,0.1,10];
 
 /* [Hidden] */
 $fn = 32;
@@ -255,7 +241,7 @@ module bottom_case(layout, params=[]) {
                 rounding=corner_radius, except=BOTTOM, anchor=BOTTOM);
 
         // Button cutouts
-        /*
+        
         if (SHOW_CUTOUTS) {
             for (btn = layout) {
                 x = btn[0] - offset[0];
@@ -265,11 +251,11 @@ module bottom_case(layout, params=[]) {
                 translate([x, y, 0])
                 cylinder(h=wall_thickness+0.2, d=size);
             }
-        }*/
+        
     }
 
     //Create touchpoints
-    /*
+    
     if(!SHOW_ASSEMBLED) {
         for (btn = layout) {
             x = btn[0] - offset[0];
@@ -279,12 +265,13 @@ module bottom_case(layout, params=[]) {
             translate([x, y, 0])
             color("black") cylinder(h=wall_thickness, d=size);
         }
-    }*/
+    }
+}
 }
 
 module wires (layout, case_width, button_size, top_thickness) {
     //Every unique y value
-    //list = [0, 22, 44];
+    list = [0, 22, 44];
     //list = [20, 42, 64, 86, 108, 130];
     offset = get_center_offset(layout, button_size);
     //wire_offset = ((button_size/2)-(button_size*0.04));
@@ -367,6 +354,6 @@ module input_device(layout, params=[]) {
 }
 
 // Create the input device
-input_device(button_layout, button_params);
+//input_device(button_layout, button_params);
 //input_device(keyboard_layout, button_params);
-//input_device(ThreexLayout, button_params);
+input_device(ThreexLayout, button_params);

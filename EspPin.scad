@@ -1,4 +1,4 @@
-pin_diameter = 1.02;
+pin_diameter = 1.02*1.03;
 spacing = 2.54;
 pin_height = 6;
 pins1 = 16; // Number of pins
@@ -11,7 +11,7 @@ module create_pin() {
     // Create the pin with a cylinder and cube for the base
     difference() {
         cube([spacing,spacing,pin_height],center=true);
-        cylinder(d=pin_diameter, h=pin_height, center=true);
+        cube([pin_diameter,pin_diameter,pin_height], center=true);
     }
 }
 
