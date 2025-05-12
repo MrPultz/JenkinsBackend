@@ -402,7 +402,7 @@ app.post('/api/process-stl', async (req, res) => {
                     res.status(500).json({ error: 'Conversion failed', details: err.message });
                 }
             } finally {
-                // Clean up all temporary files
+                // Clean up temporary files
                 setTimeout(() => {
                     tempFiles.forEach(file => {
                         if (fs.existsSync(file)) {
@@ -769,7 +769,7 @@ app.post('/api/print-via-prusa-connect', upload.single('stlFile'), async (req, r
 
     try {
         console.log('Print via Prusa Connect request received');
-        
+
         // Get STL file path - either from uploaded file or use placeholder
         let stlFilePath;
         if (req.file?.path) {
@@ -780,7 +780,7 @@ app.post('/api/print-via-prusa-connect', upload.single('stlFile'), async (req, r
             // Use placeholder file if no file was uploaded
             stlFilePath = path.join(__dirname, 'assets', 'placeholder.stl');
             console.log(`Using placeholder STL file at ${stlFilePath}`);
-            
+
             // Check if placeholder exists
             if (!fs.existsSync(stlFilePath)) {
                 // Create assets directory if it doesn't exist
@@ -789,9 +789,9 @@ app.post('/api/print-via-prusa-connect', upload.single('stlFile'), async (req, r
                     fs.mkdirSync(assetsDir, { recursive: true });
                     console.log(`Created assets directory at ${assetsDir}`);
                 }
-                
-                return res.status(400).json({ 
-                    error: 'No STL file provided and placeholder file not found. Please upload an STL file or create a placeholder.stl file in the assets directory.' 
+
+                return res.status(400).json({
+                    error: 'No STL file provided and placeholder file not found. Please upload an STL file or create a placeholder.stl file in the assets directory.'
                 });
             }
         }
@@ -801,17 +801,17 @@ app.post('/api/print-via-prusa-connect', upload.single('stlFile'), async (req, r
         const printerType = req.body.printerType || 'ORIGINAL_PRUSA_MK4';
         const filamentType = req.body.filamentType || 'Prusament PLA';
         const qualityProfile = req.body.qualityProfile || '0.15mm SPEED';
-        
+
         // Prusa Connect API credentials from environment variables
         const PRUSA_CONNECT_API_TOKEN = process.env.PRUSA_CONNECT_API_TOKEN;
-        
+
         // Use the API URL that we found working
         const PRUSA_CONNECT_API_URL = 'https://connect.prusa3d.com/api';
-        
+
         if (!PRUSA_CONNECT_API_TOKEN) {
             console.error('PRUSA_CONNECT_API_TOKEN environment variable not set');
-            return res.status(500).json({ 
-                error: 'Prusa Connect API token not configured. Please set the PRUSA_CONNECT_API_TOKEN environment variable.' 
+            return res.status(500).json({
+                error: 'Prusa Connect API token not configured. Please set the PRUSA_CONNECT_API_TOKEN environment variable.'
             });
         }
 
@@ -819,45 +819,45 @@ app.post('/api/print-via-prusa-connect', upload.single('stlFile'), async (req, r
         let printerID;
         try {
             console.log(`Fetching printers from ${PRUSA_CONNECT_API_URL}/printer`);
-            
+
             const printersResponse = await axios.get(`${PRUSA_CONNECT_API_URL}/printer`, {
                 headers: {
                     'Authorization': `Bearer ${PRUSA_CONNECT_API_TOKEN}`
                 }
             });
-            
+
             console.log('Prusa Connect API response received');
-            
+
             // Check if the response data structure is as expected
             if (!printersResponse.data || !printersResponse.data.printers) {
                 console.error('Unexpected API response format:', JSON.stringify(printersResponse.data, null, 2));
-                return res.status(500).json({ 
+                return res.status(500).json({
                     error: 'Unexpected response format from Prusa Connect API',
                     response: printersResponse.data
                 });
             }
-            
+
             // Log available printers for debugging
             console.log('Available printers:', printersResponse.data.printers.map(p => p.name));
-            
-            const printer = printersResponse.data.printers.find(p => 
+
+            const printer = printersResponse.data.printers.find(p =>
                 p.name === printerName || p.name.includes(printerName)
             );
-            
+
             if (!printer) {
-                return res.status(404).json({ 
+                return res.status(404).json({
                     error: `Printer "${printerName}" not found in your Prusa Connect account`,
                     availablePrinters: printersResponse.data.printers.map(p => p.name),
                     message: 'Please check the printer name or update the printerName parameter to match one of the available printers.'
                 });
             }
-            
+
             printerID = printer.id;
             console.log(`Found printer "${printer.name}" with ID: ${printerID}`);
-            
+
         } catch (err) {
             console.error('Error fetching printers from Prusa Connect:', err);
-            
+
             // Log more detailed error information
             if (err.response) {
                 console.error('API error response:', {
@@ -865,7 +865,7 @@ app.post('/api/print-via-prusa-connect', upload.single('stlFile'), async (req, r
                     data: err.response.data,
                     headers: err.response.headers
                 });
-                
+
                 // Handle specific error codes
                 if (err.response.status === 401) {
                     return res.status(401).json({
@@ -880,32 +880,32 @@ app.post('/api/print-via-prusa-connect', upload.single('stlFile'), async (req, r
                 }
             } else if (err.request) {
                 console.error('No response received:', err.request);
-                
+
                 return res.status(503).json({
                     error: 'No response received from Prusa Connect API. The service may be down or unavailable.',
                     details: 'Network request was sent but no response was received'
                 });
             }
-            
-            return res.status(500).json({ 
-                error: 'Failed to connect to Prusa Connect API', 
-                details: err.message 
+
+            return res.status(500).json({
+                error: 'Failed to connect to Prusa Connect API',
+                details: err.message
             });
         }
-        
+
         // Upload the STL file to Prusa Connect
         let uploadResponse;
         try {
             console.log(`Uploading STL file to printer ${printerID}`);
-            
+
             const formData = new FormData();
             formData.append('file', fs.createReadStream(stlFilePath), {
                 filename: path.basename(stlFilePath),
                 contentType: 'application/sla'
             });
-            
+
             uploadResponse = await axios.post(
-                `${PRUSA_CONNECT_API_URL}/printers/${printerID}/files`, 
+                `${PRUSA_CONNECT_API_URL}/printers/${printerID}/files`,
                 formData,
                 {
                     headers: {
@@ -916,18 +916,18 @@ app.post('/api/print-via-prusa-connect', upload.single('stlFile'), async (req, r
                     maxBodyLength: Infinity
                 }
             );
-            
+
             console.log('File uploaded successfully to Prusa Connect');
-            
+
         } catch (err) {
             console.error('Error uploading file to Prusa Connect:', err);
-            
+
             if (err.response) {
                 console.error('Upload error response:', {
                     status: err.response.status,
                     data: err.response.data
                 });
-                
+
                 // Handle specific error codes for upload
                 if (err.response.status === 413) {
                     return res.status(413).json({
@@ -936,40 +936,40 @@ app.post('/api/print-via-prusa-connect', upload.single('stlFile'), async (req, r
                     });
                 }
             }
-            
-            return res.status(500).json({ 
-                error: 'Failed to upload file to Prusa Connect', 
-                details: err.message 
+
+            return res.status(500).json({
+                error: 'Failed to upload file to Prusa Connect',
+                details: err.message
             });
         }
-        
+
         // Get file ID and name from the upload response
         let fileID, fileName;
-        
+
         try {
             fileID = uploadResponse.data.id;
             fileName = uploadResponse.data.name;
-            
+
             console.log(`File uploaded with ID: ${fileID}, name: ${fileName}`);
-            
+
             if (!fileID) {
                 throw new Error('File ID missing from upload response');
             }
         } catch (err) {
             console.error('Error parsing upload response:', err);
             console.error('Upload response data:', uploadResponse.data);
-            
+
             return res.status(500).json({
                 error: 'Failed to get file ID from upload response',
                 details: err.message,
                 responseData: uploadResponse.data
             });
         }
-        
+
         // Start slicing and printing the file
         try {
             console.log(`Starting slice-and-print operation for file ${fileID}`);
-            
+
             // Prepare the slice and print request payload
             const sliceAndPrintPayload = {
                 file_id: fileID,
@@ -977,12 +977,12 @@ app.post('/api/print-via-prusa-connect', upload.single('stlFile'), async (req, r
                 filament_profile: filamentType,
                 print_profile: qualityProfile
             };
-            
+
             console.log('Slice and print payload:', sliceAndPrintPayload);
-            
+
             // Request slicing with the specified parameters
             const printResponse = await axios.post(
-                `${PRUSA_CONNECT_API_URL}/printers/${printerID}/slice-and-print`, 
+                `${PRUSA_CONNECT_API_URL}/printers/${printerID}/slice-and-print`,
                 sliceAndPrintPayload,
                 {
                     headers: {
@@ -991,11 +991,11 @@ app.post('/api/print-via-prusa-connect', upload.single('stlFile'), async (req, r
                     }
                 }
             );
-            
+
             console.log(`File "${fileName}" slicing and printing started on printer "${printerName}"`);
             console.log('Print response:', printResponse.data);
-            
-            return res.status(200).json({ 
+
+            return res.status(200).json({
                 message: `Print job started on ${printerName}`,
                 printer: printerName,
                 file: fileName,
@@ -1003,31 +1003,31 @@ app.post('/api/print-via-prusa-connect', upload.single('stlFile'), async (req, r
                 file_id: fileID,
                 print_response: printResponse.data
             });
-            
+
         } catch (err) {
             console.error('Error starting print job on Prusa Connect:', err);
-            
+
             if (err.response) {
                 console.error('Print error response:', {
                     status: err.response.status,
                     data: err.response.data
                 });
             }
-            
-            return res.status(500).json({ 
-                error: 'Failed to start print job on Prusa Connect', 
+
+            return res.status(500).json({
+                error: 'Failed to start print job on Prusa Connect',
                 details: err.message,
                 response: err.response?.data
             });
         }
-        
+
     } catch (err) {
         console.error('Error in Prusa Connect print process:', err);
-        
+
         if (!res.headersSent) {
-            res.status(500).json({ 
-                error: 'Print process failed', 
-                details: err.message 
+            res.status(500).json({
+                error: 'Print process failed',
+                details: err.message
             });
         }
     } finally {
@@ -1048,34 +1048,34 @@ app.post('/api/print-via-prusa-connect', upload.single('stlFile'), async (req, r
 app.get('/api/test-prusa-connect', async (req, res) => {
     try {
         const PRUSA_CONNECT_API_TOKEN = process.env.PRUSA_CONNECT_API_TOKEN;
-        
+
         if (!PRUSA_CONNECT_API_TOKEN) {
-            return res.status(500).json({ 
-                error: 'Prusa Connect API token not configured. Please set the PRUSA_CONNECT_API_TOKEN environment variable.' 
+            return res.status(500).json({
+                error: 'Prusa Connect API token not configured. Please set the PRUSA_CONNECT_API_TOKEN environment variable.'
             });
         }
-        
+
         // Try different API URLs
         const possibleApiUrls = [
             'https://connect.prusa3d.com/c/api',
             'https://connect.prusa3d.com/',
             'https://connect.prusa3d.com/api'
         ];
-        
+
         let successful = false;
         let responseData = null;
         let error = null;
-        
+
         for (const apiUrl of possibleApiUrls) {
             try {
                 console.log(`Testing Prusa Connect API URL: ${apiUrl}`);
-                
+
                 const response = await axios.get(`${apiUrl}/printers`, {
                     headers: {
                         'Authorization': `Bearer ${PRUSA_CONNECT_API_TOKEN}`
                     }
                 });
-                
+
                 successful = true;
                 responseData = response.data;
                 console.log('API test successful with URL:', apiUrl);
@@ -1085,7 +1085,7 @@ app.get('/api/test-prusa-connect', async (req, res) => {
                 console.error(`API test failed with URL ${apiUrl}:`, err.message);
             }
         }
-        
+
         if (successful) {
             return res.status(200).json({
                 message: 'Successfully connected to Prusa Connect API',
@@ -1099,7 +1099,7 @@ app.get('/api/test-prusa-connect', async (req, res) => {
         }
     } catch (err) {
         console.error('Error testing Prusa Connect API:', err);
-        
+
         return res.status(500).json({
             error: 'Test failed',
             details: err.message
@@ -1113,7 +1113,7 @@ app.post('/api/slice-and-print-direct', upload.single('stlFile'), async (req, re
 
     try {
         console.log('Slice and print direct request received');
-        
+
         // Get STL file path - either from uploaded file or use placeholder
         let stlFilePath;
         if (req.file?.path) {
@@ -1124,7 +1124,7 @@ app.post('/api/slice-and-print-direct', upload.single('stlFile'), async (req, re
             // Use placeholder file if no file was uploaded
             stlFilePath = path.join(__dirname, 'assets', 'placeholder.stl');
             console.log(`Using placeholder STL file at ${stlFilePath}`);
-            
+
             // Check if placeholder exists
             if (!fs.existsSync(stlFilePath)) {
                 // Create assets directory if it doesn't exist
@@ -1133,9 +1133,9 @@ app.post('/api/slice-and-print-direct', upload.single('stlFile'), async (req, re
                     fs.mkdirSync(assetsDir, { recursive: true });
                     console.log(`Created assets directory at ${assetsDir}`);
                 }
-                
-                return res.status(400).json({ 
-                    error: 'No STL file provided and placeholder file not found. Please upload an STL file or create a placeholder.stl file in the assets directory.' 
+
+                return res.status(400).json({
+                    error: 'No STL file provided and placeholder file not found. Please upload an STL file or create a placeholder.stl file in the assets directory.'
                 });
             }
         }
@@ -1145,29 +1145,29 @@ app.post('/api/slice-and-print-direct', upload.single('stlFile'), async (req, re
         const printerPreset = req.body.printerPreset || 'MK4 Master Thesis * Original Prusa MK4 Input Shaper 0.4 nozzle';
         const filamentType = req.body.filamentType || 'Prusament PLA';
         const qualityProfile = req.body.qualityProfile || '0.15mm SPEED';
-        
+
         // Generate a temp gcode file path
         const uniqueID = crypto.randomBytes(8).toString('hex');
         const gcodeFilePath = path.join(tempDir, `${uniqueID}.gcode`);
         tempFiles.push(gcodeFilePath);
-        
+
         // Find the PrusaSlicer executable
         const prusaSlicerPath = config.findPrusaSlicerExecutable();
         if (!prusaSlicerPath) {
-            return res.status(500).json({ 
-                error: 'PrusaSlicer executable not found. Please make sure PrusaSlicer is installed correctly.' 
+            return res.status(500).json({
+                error: 'PrusaSlicer executable not found. Please make sure PrusaSlicer is installed correctly.'
             });
         }
-        
+
         console.log(`Using PrusaSlicer at: ${prusaSlicerPath}`);
-        
+
         try {
             // PrusaSlicer command using the complete preset name
             // Format: prusa-slicer-console --export-gcode --printer "printer_preset" --filament "filament_preset" --print "print_preset" --output "output.gcode" "input.stl"
             const sliceAndPrintCmd = `"${prusaSlicerPath}" --export-gcode --printer "${printerPreset}" --filament "${filamentType}" --print "${qualityProfile}" --output "${gcodeFilePath}" "${stlFilePath}"`;
-            
+
             console.log(`Executing slice and print command: ${sliceAndPrintCmd}`);
-            
+
             // Execute PrusaSlicer to slice the model
             await new Promise((resolve, reject) => {
                 exec(sliceAndPrintCmd, {maxBuffer: 5 * 1024 * 1024}, (error, stdout, stderr) => {
@@ -1180,26 +1180,26 @@ app.post('/api/slice-and-print-direct', upload.single('stlFile'), async (req, re
                     }
                 });
             });
-            
+
             // Check if G-code file was created
             if (!fs.existsSync(gcodeFilePath)) {
                 throw new Error('G-code file not created. PrusaSlicer failed to slice the model.');
             }
-            
+
             // Now we need to send the G-code file to the printer
             // This can be done using PrusaSlicer's built-in upload command, OS print commands,
             // or by returning the G-code file for the frontend to handle
-            
+
             // For this example, we'll use PrusaSlicer's built-in upload functionality if available
             // Otherwise, we'll return the G-code file to the client
-            
+
             try {
                 // Create a command to upload to printer using PrusaSlicer
                 // Note: This might not be supported in all versions, so we'll have a fallback
                 const uploadCmd = `"${prusaSlicerPath}" --upload "${gcodeFilePath}" --printer "${printerPreset}"`;
-                
+
                 console.log(`Attempting to upload directly to printer with command: ${uploadCmd}`);
-                
+
                 await new Promise((resolve, reject) => {
                     exec(uploadCmd, {maxBuffer: 5 * 1024 * 1024}, (error, stdout, stderr) => {
                         if (error) {
@@ -1211,15 +1211,15 @@ app.post('/api/slice-and-print-direct', upload.single('stlFile'), async (req, re
                         }
                     });
                 });
-                
+
                 // If we reach here, the command ran but might have failed
                 // Let's check if the G-code file still exists (if it was successfully sent, some versions delete it)
                 const fileStillExists = fs.existsSync(gcodeFilePath);
-                
+
                 if (!fileStillExists) {
                     console.log('G-code file was removed, assuming successful upload to printer');
-                    
-                    return res.status(200).json({ 
+
+                    return res.status(200).json({
                         message: `Print job successfully sent to printer "${printerPreset}"`,
                         printer: printerPreset,
                         file: path.basename(stlFilePath),
@@ -1227,48 +1227,609 @@ app.post('/api/slice-and-print-direct', upload.single('stlFile'), async (req, re
                     });
                 } else {
                     console.log('G-code file still exists, sending to client for manual printing');
-                    
+
                     // Read the G-code file content
                     const gcodeContent = await fs.readFile(gcodeFilePath);
-                    
+
                     // Send the G-code file to the client
                     res.setHeader('Content-Type', 'application/octet-stream');
                     res.setHeader('Content-Disposition', `attachment; filename="${printerPreset}_${path.basename(stlFilePath, '.stl')}.gcode"`);
                     res.send(gcodeContent);
-                    
+
                     console.log(`G-code file sent to client for manual upload to printer`);
                 }
-                
+
             } catch (uploadErr) {
                 console.error('Error during printer upload attempt:', uploadErr);
-                
+
                 // Fall back to sending the G-code file to the client
                 const gcodeContent = await fs.readFile(gcodeFilePath);
-                
+
                 res.setHeader('Content-Type', 'application/octet-stream');
                 res.setHeader('Content-Disposition', `attachment; filename="${printerPreset}_${path.basename(stlFilePath, '.stl')}.gcode"`);
                 res.send(gcodeContent);
-                
+
                 console.log(`G-code file sent to client as fallback`);
             }
-            
+
         } catch (err) {
             console.error('Error slicing and sending to printer:', err);
-            
-            return res.status(500).json({ 
-                error: 'Failed to slice and send to printer', 
+
+            return res.status(500).json({
+                error: 'Failed to slice and send to printer',
                 details: err.message
             });
         }
-        
+
     } catch (err) {
         console.error('Error in direct print process:', err);
-        
+
         if (!res.headersSent) {
-            res.status(500).json({ 
-                error: 'Print process failed', 
-                details: err.message 
+            res.status(500).json({
+                error: 'Print process failed',
+                details: err.message
             });
+        }
+    } finally {
+        // Clean up temporary files
+        setTimeout(() => {
+            tempFiles.forEach(file => {
+                if (fs.existsSync(file)) {
+                    fs.unlink(file, err => {
+                        if (err) console.error(`Error deleting file ${file}:`, err);
+                    });
+                }
+            });
+        }, 1000);
+    }
+});
+
+// Endpoint to generate design previews as PNG images
+app.post('/api/generate-previews', async (req, res) => {
+    let tempFiles = [];
+
+    try {
+        console.log('Generate preview images request received');
+
+        // Log the entire request body for debugging
+        console.log('Request body:', JSON.stringify(req.body, null, 2));
+
+        // Get designs from the request body
+        let designs = [];
+
+        // Check different possible structures of the request body
+        if (req.body.designs && Array.isArray(req.body.designs)) {
+            designs = req.body.designs;
+            console.log('Found designs array in req.body.designs');
+        } else if (Array.isArray(req.body)) {
+            designs = req.body;
+            console.log('Request body is directly an array of designs');
+        } else if (req.body.design) {
+            // Handle case where a single design is sent under 'design' property
+            designs = [req.body.design];
+            console.log('Found single design in req.body.design');
+        } else if (req.body.count) {
+            // This is just the count parameter, actual designs may be elsewhere
+            console.log(`Request contained count: ${req.body.count} but no designs`);
+            // You might want to return an error or generate random designs here
+            return res.status(400).json({
+                error: 'Request contains count parameter but no actual designs. Please provide designs in the request.'
+            });
+        }
+
+        if (!designs || designs.length === 0) {
+            return res.status(400).json({
+                error: 'Missing or invalid designs array. Please provide a valid array of designs.',
+                receivedBody: req.body
+            });
+        }
+
+        console.log(`Received ${designs.length} designs to generate previews for`);
+
+        // Log each design ID for debugging
+        designs.forEach((design, index) => {
+            console.log(`Design ${index + 1} ID: ${design.id || 'unknown'}`);
+        });
+
+        // Generate previews for each design
+        const previewResults = [];
+
+        for (const design of designs) {
+            try {
+                // Generate unique ID for this preview
+                const uniqueID = crypto.randomBytes(8).toString('hex');
+                const stlFile = path.join(tempDir, `${uniqueID}.stl`);
+                const pngFile = path.join(tempDir, `${uniqueID}.png`);
+                const logFile = path.join(tempDir, `${uniqueID}.log`);
+
+                // Add files to cleanup list
+                tempFiles.push(stlFile, pngFile, logFile);
+
+                // Format arrays for OpenSCAD
+                function formatArrayForOpenSCAD(arr) {
+                    if (Array.isArray(arr)) {
+                        return `[${arr.map(item => {
+                            if (Array.isArray(item)) {
+                                return formatArrayForOpenSCAD(item);
+                            } else if (typeof item === 'string') {
+                                return `"${item}"`;
+                            } else {
+                                return item;
+                            }
+                        }).join(',')}]`;
+                    }
+                    return arr;
+                }
+
+                // Extract necessary design data
+                const buttonLayout = design.button_layout;
+                const buttonParams = design.button_params;
+
+                if (!buttonLayout) {
+                    console.error(`Design ${design.id || 'unknown'} is missing button_layout`);
+                    throw new Error('Missing button_layout in design');
+                }
+
+                if (!buttonParams) {
+                    console.log(`Design ${design.id || 'unknown'} is missing button_params, will use defaults`);
+                    // You might want to use default parameters here
+                }
+
+                console.log(`Generating preview for design ID: ${design.id || 'unknown'}`);
+
+                // OpenSCAD command for rendering to PNG
+                // --render option ensures fully rendered image
+                // --colorscheme option for consistent coloring
+                // --camera option for consistent view
+                const inputDeviceScad = path.join(__dirname, 'input_device.scad');
+                const parametricButtonScad = path.join(__dirname, 'ParametricButton.scad');
+
+                const openScadCmd = `openscad --preview -o "${pngFile}" --imgsize=800,600 --colorscheme=Tomorrow --camera=20,-120,140,60,0,20,500 "${inputDeviceScad}" -D "button_layout=${formatArrayForOpenSCAD(buttonLayout)}" -D "button_params=${formatArrayForOpenSCAD(buttonParams)}"`;
+
+                console.log(`Running OpenSCAD preview command for design ${design.id || 'unknown'}`);
+
+                // Execute OpenSCAD to render PNG
+                await new Promise((resolve, reject) => {
+                    const process = exec(
+                        openScadCmd,
+                        {maxBuffer: 5 * 1024 * 1024},
+                        (error, stdout, stderr) => {
+                            // Write any output to the log file
+                            fs.writeFileSync(logFile, `STDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`);
+
+                            if (error) {
+                                console.error(`OpenSCAD error for design ${design.id}:`, stderr);
+                                reject(error);
+                                return;
+                            } else {
+                                resolve(stdout);
+                            }
+                        }
+                    );
+
+                    // Set a timeout
+                    setTimeout(() => {
+                        process.kill();
+                        reject(new Error('OpenSCAD operation timed out after 60 seconds'));
+                    }, 60000); // 60 second timeout for previews
+                });
+
+                // Check if PNG file was created
+                if (!fs.existsSync(pngFile)) {
+                    throw new Error(`PNG preview for design ${design.id} was not created`);
+                }
+
+                // Read the PNG file as base64
+                const pngData = await fs.readFile(pngFile);
+                const pngBase64 = pngData.toString('base64');
+
+                // Add preview data to results
+                previewResults.push({
+                    id: design.id,
+                    type: design.type,
+                    preview: `data:image/png;base64,${pngBase64}`
+                });
+
+                console.log(`Successfully generated preview for design ${design.id}`);
+
+            } catch (designErr) {
+                console.error(`Error generating preview for design ${design.id}:`, designErr);
+
+                // Add error information to results instead of failing the whole request
+                previewResults.push({
+                    id: design.id,
+                    type: design.type,
+                    error: designErr.message,
+                    preview: null
+                });
+            }
+        }
+
+        // Return the generated previews
+        res.status(200).json(previewResults);
+
+    } catch (err) {
+        console.error('Error generating previews:', err);
+        res.status(500).json({ error: 'Failed to generate previews', details: err.message });
+    } finally {
+        // Clean up temporary files
+        setTimeout(() => {
+            tempFiles.forEach(file => {
+                if (fs.existsSync(file)) {
+                    fs.unlink(file, err => {
+                        if (err) console.error(`Error deleting file ${file}:`, err);
+                    });
+                }
+            });
+        }, 1000);
+    }
+});
+
+// Endpoint to generate a single preview
+app.post('/api/generate-single-preview', async (req, res) => {
+    let tempFiles = [];
+
+    try {
+        console.log('Generate single preview request received');
+
+        // Get design from the request body
+        const { design } = req.body;
+
+        if (!design || !design.button_layout || !design.button_params) {
+            return res.status(400).json({
+                error: 'Missing or invalid design. Please provide a valid design with button_layout and button_params.'
+            });
+        }
+
+        // Generate unique ID for this preview
+        const uniqueID = crypto.randomBytes(8).toString('hex');
+        const pngFile = path.join(tempDir, `${uniqueID}.png`);
+        const logFile = path.join(tempDir, `${uniqueID}.log`);
+
+        // Add files to cleanup list
+        tempFiles.push(pngFile, logFile);
+
+        // Path to the existing SCAD files
+        const inputDeviceScad = path.join(__dirname, 'input_device.scad');
+        const parametricButtonScad = path.join(__dirname, 'ParametricButton.scad');
+
+        // Format arrays for OpenSCAD
+        function formatArrayForOpenSCAD(arr) {
+            if (Array.isArray(arr)) {
+                return `[${arr.map(item => {
+                    if (Array.isArray(item)) {
+                        return formatArrayForOpenSCAD(item);
+                    } else if (typeof item === 'string') {
+                        return `"${item}"`;
+                    } else {
+                        return item;
+                    }
+                }).join(',')}]`;
+            }
+            return arr;
+        }
+
+        // Execute OpenSCAD to render a PNG preview
+        const buttonLayout = design.button_layout;
+        const buttonParams = design.button_params;
+
+        // OpenSCAD command for rendering to PNG
+        const openScadCmd = `openscad --render -o "${pngFile}" --imgsize=800,600 --colorscheme=Tomorrow --camera=0,0,150,55,0,35,750 "${inputDeviceScad}" -D "button_layout=${formatArrayForOpenSCAD(buttonLayout)}" -D "button_params=${formatArrayForOpenSCAD(buttonParams)}"`;
+
+        console.log(`Running OpenSCAD preview command for design ${design.id || 'unknown'}`);
+
+        await new Promise((resolve, reject) => {
+            const process = exec(
+                openScadCmd,
+                {maxBuffer: 5 * 1024 * 1024},
+                (error, stdout, stderr) => {
+                    // Write any output to the log file
+                    fs.writeFileSync(logFile, `STDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`);
+
+                    if (error) {
+                        console.error('OpenSCAD error output:', stderr);
+                        reject(error);
+                        return;
+                    } else {
+                        resolve(stdout);
+                    }
+                }
+            );
+
+            // Set a timeout
+            setTimeout(() => {
+                process.kill();
+                reject(new Error('OpenSCAD operation timed out after 60 seconds'));
+            }, 60000); // 60 second timeout for previews
+        });
+
+        // Check if PNG file was created
+        if (!fs.existsSync(pngFile)) {
+            throw new Error('PNG preview was not created');
+        }
+
+        // Read the PNG file as base64
+        const pngData = await fs.readFile(pngFile);
+        const pngBase64 = pngData.toString('base64');
+
+        // Return the preview
+        res.status(200).json({
+            id: design.id || uniqueID,
+            type: design.type || 'Button Panel',
+            preview: `data:image/png;base64,${pngBase64}`
+        });
+
+        console.log(`Successfully generated preview for design`);
+
+    } catch (err) {
+        console.error('Error generating single preview:', err);
+        res.status(500).json({ error: 'Failed to generate preview', details: err.message });
+    } finally {
+        // Clean up temporary files
+        setTimeout(() => {
+            tempFiles.forEach(file => {
+                if (fs.existsSync(file)) {
+                    fs.unlink(file, err => {
+                        if (err) console.error(`Error deleting file ${file}:`, err);
+                    });
+                }
+            });
+        }, 1000);
+    }
+});
+
+// Endpoint to generate STL from a selected design
+app.post('/api/generate-stl', async (req, res) => {
+    let tempFiles = [];
+
+    try {
+        console.log('Generate STL from design request received');
+        console.log('Request body:', JSON.stringify(req.body, null, 2));
+
+        // Extract design data - handle different possible formats
+        let design;
+        let designId;
+        let buttonLayout;
+        let buttonParams;
+
+        // Check for design ID in various formats
+        if (req.body.designId) {
+            designId = req.body.designId;
+            console.log(`Received designId: ${designId}`);
+
+            // Try to parse numeric ID from string ID (e.g., "design_2" -> 2)
+            let numericId = null;
+            if (typeof designId === 'string') {
+                const matches = designId.match(/(\d+)$/);
+                if (matches && matches[1]) {
+                    numericId = parseInt(matches[1], 10);
+                    console.log(`Extracted numeric ID ${numericId} from designId ${designId}`);
+                }
+            }
+
+            // Check if the full design is also provided
+            if (req.body.design) {
+                design = req.body.design;
+                console.log('Design object included with designId');
+
+                // Check for nested button layout structure
+                if (design.params && design.params.buttonLayout) {
+                    buttonLayout = design.params.buttonLayout;
+                    console.log('Found buttonLayout in design.params');
+                }
+
+                if (design.params && design.params.buttonParams) {
+                    buttonParams = design.params.buttonParams;
+                    console.log('Found buttonParams in design.params');
+                }
+
+                // Direct properties check
+                if (design.button_layout) {
+                    buttonLayout = design.button_layout;
+                    console.log('Found buttonLayout directly in design object');
+                }
+
+                if (design.buttonLayout) {
+                    buttonLayout = design.buttonLayout;
+                    console.log('Found buttonLayout (camelCase) directly in design object');
+                }
+
+                if (design.button_params) {
+                    buttonParams = design.button_params;
+                    console.log('Found buttonParams directly in design object');
+                }
+
+                if (design.buttonParams) {
+                    buttonParams = design.buttonParams;
+                    console.log('Found buttonParams (camelCase) directly in design object');
+                }
+            }
+        }
+
+        // If we still don't have button layout and params, check other request properties
+        if (!buttonLayout) {
+            // Check direct request properties
+            if (req.body.button_layout) {
+                buttonLayout = req.body.button_layout;
+                console.log('Found buttonLayout directly in request');
+            } else if (req.body.buttonLayout) {
+                buttonLayout = req.body.buttonLayout;
+                console.log('Found buttonLayout (camelCase) directly in request');
+            } else if (req.body.params && req.body.params.buttonLayout) {
+                buttonLayout = req.body.params.buttonLayout;
+                console.log('Found buttonLayout in request.params');
+            }
+        }
+
+        if (!buttonParams) {
+            // Check direct request properties
+            if (req.body.button_params) {
+                buttonParams = req.body.button_params;
+                console.log('Found buttonParams directly in request');
+            } else if (req.body.buttonParams) {
+                buttonParams = req.body.buttonParams;
+                console.log('Found buttonParams (camelCase) directly in request');
+            } else if (req.body.params && req.body.params.buttonParams) {
+                buttonParams = req.body.params.buttonParams;
+                console.log('Found buttonParams in request.params');
+            }
+        }
+
+        // Validate that we have button layout to work with
+        if (!buttonLayout) {
+            console.error('No valid button layout found in request');
+            return res.status(400).json({
+                error: 'Missing button layout information. Please provide button_layout or buttonLayout.',
+                requestBody: req.body,
+                tip: "Your request should include button layout data either in design.params.buttonLayout, design.button_layout, or directly in the request body."
+            });
+        }
+
+        // Log the button layout and params we're going to use
+        console.log('Using buttonLayout:', buttonLayout);
+        console.log('Using buttonParams:', buttonParams || 'Default params will be used');
+
+        // Generate unique ID for this conversion
+        const uniqueID = crypto.randomBytes(8).toString('hex');
+        const stlFile = path.join(tempDir, `${uniqueID}.stl`);
+        const logFile = path.join(tempDir, `${uniqueID}.log`);
+
+        // Add files to cleanup list
+        tempFiles.push(stlFile, logFile);
+
+        // Path to the existing SCAD files
+        const inputDeviceScad = path.join(__dirname, 'input_device.scad');
+        const parametricButtonScad = path.join(__dirname, 'ParametricButton.scad');
+
+        // Check if the necessary SCAD files exist
+        if (!fs.existsSync(inputDeviceScad) || !fs.existsSync(parametricButtonScad)) {
+            console.error(`Missing SCAD files. inputDeviceScad exists: ${fs.existsSync(inputDeviceScad)}, parametricButtonScad exists: ${fs.existsSync(parametricButtonScad)}`);
+            return res.status(500).send('Required SCAD files not found');
+        }
+
+        // Format arrays for OpenSCAD
+        function formatArrayForOpenSCAD(arr) {
+            if (Array.isArray(arr)) {
+                return `[${arr.map(item => {
+                    if (Array.isArray(item)) {
+                        return formatArrayForOpenSCAD(item);
+                    } else if (typeof item === 'string') {
+                        return `"${item}"`;
+                    } else {
+                        return item;
+                    }
+                }).join(',')}]`;
+            }
+            return arr;
+        }
+
+        // Execute OpenSCAD to convert to STL
+        try {
+            console.log(`Starting OpenSCAD conversion for design ${designId || 'unknown'}`);
+
+            // Build the OpenSCAD command
+            let openScadCmd;
+            if (buttonParams) {
+                // Use both layout and params
+                openScadCmd = `openscad --debug all -q -o "${stlFile}" "${inputDeviceScad}" -D "button_layout=${formatArrayForOpenSCAD(buttonLayout)}" -D "button_params=${formatArrayForOpenSCAD(buttonParams)}"`;
+            } else {
+                // Use only layout with default params
+                openScadCmd = `openscad --debug all -q -o "${stlFile}" "${inputDeviceScad}" -D "button_layout=${formatArrayForOpenSCAD(buttonLayout)}"`;
+            }
+
+            console.log(`Running command: ${openScadCmd}`);
+
+            await new Promise((resolve, reject) => {
+                const process = exec(
+                    openScadCmd,
+                    {maxBuffer: 10 * 1024 * 1024}, // Increase buffer size to 10MB
+                    (error, stdout, stderr) => {
+                        // Write any output to the log file
+                        fs.writeFileSync(logFile, `STDOUT:\n${stdout}\n\nSTDERR:\n${stderr}`);
+
+                        if (error) {
+                            console.error('OpenSCAD error output:', stderr);
+                            reject(error);
+                            return;
+                        } else {
+                            resolve(stdout);
+                        }
+                    }
+                );
+
+                // Set a timeout
+                setTimeout(() => {
+                    process.kill();
+                    reject(new Error('OpenSCAD operation timed out after 3 minutes'));
+                }, 180000); // 3 minute timeout
+            });
+
+            // Check if STL file was created and has valid content
+            if (!fs.existsSync(stlFile)) {
+                throw new Error('STL file not created');
+            }
+
+            const stats = fs.statSync(stlFile);
+            if (stats.size === 0) {
+                throw new Error('STL file was created but is empty');
+            }
+
+            console.log(`STL file successfully created: ${stlFile} (${stats.size} bytes)`);
+
+            // Send STL file
+            const stlContent = await fs.readFile(stlFile);
+
+            // Set filename based on design info
+            const filename = designId !== 'unknown' && designId !== 'direct'
+                ? `button_device_${designId}.stl`
+                : 'button_device.stl';
+
+            res.setHeader('Content-Type', 'application/octet-stream');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            res.send(stlContent);
+
+            console.log(`STL file successfully sent to client as ${filename}`);
+
+        } catch (err) {
+            console.error('Error executing OpenSCAD:', err);
+
+            // Read log file for details if available
+            if (fs.existsSync(logFile)) {
+                try {
+                    const logContent = fs.readFileSync(logFile, 'utf8');
+                    console.error("OpenSCAD log:", logContent);
+
+                    if (!res.headersSent) {
+                        res.status(500).json({
+                            error: 'OpenSCAD conversion failed',
+                            details: err.message,
+                            log: logContent
+                        });
+                    }
+                } catch (logErr) {
+                    console.error("Failed to read log file:", logErr);
+
+                    if (!res.headersSent) {
+                        res.status(500).json({
+                            error: 'OpenSCAD conversion failed',
+                            details: err.message
+                        });
+                    }
+                }
+            } else {
+                if (!res.headersSent) {
+                    res.status(500).json({
+                        error: 'OpenSCAD conversion failed',
+                        details: err.message
+                    });
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Error generating STL from design:', err);
+
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Failed to generate STL', details: err.message });
         }
     } finally {
         // Clean up temporary files
