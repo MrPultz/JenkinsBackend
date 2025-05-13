@@ -654,7 +654,7 @@ button_params = ${formatArrayForOpenSCAD(buttonParams)};
             console.log(`Starting OpenSCAD conversion of ${outputScadFile} to ${stlFile}`);
 
             // Use --debug all flag to get more verbose output
-            const openScadCmd = `openscad --debug all -q -o "${stlFile}" "${inputDeviceScad}" -D "button_layout=${formatArrayForOpenSCAD(buttonLayout)}" -D "button_params=${formatArrayForOpenSCAD(buttonParams)}"`;
+            const openScadCmd = `openscad --debug all -q -o "${stlFile}" "${inputDeviceScad}" -D "ThreexLayout=${formatArrayForOpenSCAD(buttonLayout)}" -D "button_params=${formatArrayForOpenSCAD(buttonParams)}"`;
             console.log(`Running command: ${openScadCmd}`);
 
             await new Promise((resolve, reject) => {
@@ -1384,7 +1384,7 @@ app.post('/api/generate-previews', async (req, res) => {
                 const inputDeviceScad = path.join(__dirname, 'input_device.scad');
                 const parametricButtonScad = path.join(__dirname, 'ParametricButton.scad');
 
-                const openScadCmd = `openscad --preview -o "${pngFile}" --imgsize=800,600 --colorscheme=Tomorrow --camera=20,-120,140,60,0,20,500 "${inputDeviceScad}" -D "button_layout=${formatArrayForOpenSCAD(buttonLayout)}" -D "button_params=${formatArrayForOpenSCAD(buttonParams)}"`;
+                const openScadCmd = `openscad --preview -o "${pngFile}" --imgsize=800,600 --colorscheme=Tomorrow --camera=20,-120,140,60,0,20,500 "${inputDeviceScad}" -D "ThreexLayout=${formatArrayForOpenSCAD(buttonLayout)}" -D "button_params=${formatArrayForOpenSCAD(buttonParams)}"`;
 
                 console.log(`Running OpenSCAD preview command for design ${design.id || 'unknown'}`);
 
