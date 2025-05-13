@@ -8,11 +8,12 @@ default_case_height = 0;
 bend_height = 0.725; // Keep fixed for mechanical properties
 bridge_base_width = 1.5; // Base width that could be scaled
 ring_width_ratio = 0.08; // 8% of diameter for outer and middle rings
-ring_spacing = 0.02; // 3% of diameter for spacing between rings
+ring_spacing = 0.02; // 2% of diameter for spacing between rings
 
 $fn=32; // Set the number of facets for smoothness
 
 module create_button(diameter = default_button_diameter, outer_ring_height = default_outer_ring_height) {
+    echo(diameter);
     // Derived parameters based on input diameter
     button_radius = diameter / 2;
     
@@ -21,6 +22,7 @@ module create_button(diameter = default_button_diameter, outer_ring_height = def
     middle_ring_offset = outer_ring_d + (diameter * ring_spacing); // 2% spacing
     middle_ring_d = diameter * ring_width_ratio; // 8% of diameter
     inner_ring_offset = middle_ring_offset + middle_ring_d + (diameter * ring_spacing); // 2% spacing
+    echo("Inner offset ring: ", inner_ring_offset);
 
     // Bridge parameters
     bridge_width = bridge_base_width; // Could optionally scale with diameter using: diameter * 0.083
@@ -63,38 +65,49 @@ module create_rings(r, outer_thickness, middle_offset, middle_thickness,
         cylinder(h=bend_height, r=r-middle_offset);
         cylinder(h=bend_height, r=r-middle_offset-middle_thickness);
     }
-    // Create Inner ring with cross  
+    // Create Inner ring
     difference() {   
         cylinder(h=bend_height, r=r-inner_offset);
         cylinder(h=bend_height, r=r*0.4); // Inner hole for cross
     }
 }
 
-module create_keycap(size1, size2, outer_height, case_height, x_offset, y_offset, z_offset) {
-    // Ring parameters
+module create_keycap(size1, size2, outer_height, case_height, x_offset, y_offset, z_offset, letter = "") {
+    // Ring parameters'
     outer_ring_d = size1 * ring_width_ratio; // 8% of diameter
     middle_ring_offset = outer_ring_d + (size1 * ring_spacing); // 2% spacing
     middle_ring_d = size1 * ring_width_ratio; // 8% of diameter
     inner_offset = middle_ring_offset + middle_ring_d + (size1 * ring_spacing); // 2% spacing
-    letter = ""; // Default letter to be engraved
 
+    //echo("Creating keycap with size1: ", size1, ", size2: ", size2);
     // Create the keycap with the specified diameter and outer ring height
     translate([x_offset, y_offset, -z_offset])
+    color("lightgray")
     difference() {
         union() {
-        if(size2 == 0){cylinder(d=size1, h=1);}
+        if(size2 == 0){
+            cylinder(d=size1, h=1);
+            }
         else{cuboid([size2, size1, 1], rounding=1, edges="Z", anchor=BOTTOM);}
-            cylinder(d=size1-inner_offset, h=outer_height+2);
+            cylinder(d= size1-inner_offset*2, h=outer_height+2);
             translate([0, 0, outer_height+2])
             cylinder(d=size1*0.4, h=case_height+1);
         }
 
         // Add letter if provided
         if (letter != "") {
-            echo("Adding letter: ", letter);
             linear_extrude(2)
-            text(text=letter, size=5, halign="center", valign="center", font="Liberation Sans:style=Bold");
+            text(text=letter, size=size1/6, halign="center", valign="center", font="Liberation Sans:style=Bold", direction="ltr");
         }
+    }
+
+    translate([x_offset, y_offset, -z_offset])
+    // Add letter if provided
+    if (letter != "") {
+        echo("Adding letter: ", letter);
+        color("black")
+        linear_extrude(2)
+        text(text=letter, size=size1/6, halign="center", valign="center", font="Liberation Sans:style=Bold", direction="ltr");
     }
 }   
 

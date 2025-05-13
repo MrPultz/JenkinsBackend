@@ -21,9 +21,9 @@ DEFAULT_LIP_CLEARANCE = 0.25;
 // Button scaling (affects only visual size of button in preview)
 BUTTON_VISUAL_SCALE = 1;
 // Show assembled view
-SHOW_ASSEMBLED = true;
+SHOW_ASSEMBLED = false;
 // Show button cutouts in top plate
-SHOW_CUTOUTS = true;
+SHOW_CUTOUTS = false;
 // Show actual buttons 
 SHOW_BUTTONS = true;
 // Show bottom case
@@ -35,20 +35,17 @@ ASSEMBLY_GAP = 10;
 
 // Use either a supplied layout or one of the built-in layout functions
 // Button parameters = [x, y, size, size2], leaving size2 empty will use size as the button size
-button_layout = [
-    [0, 22, 18, 30],    // W key (center, top)
-    [-22, 0, 18],   // A key (left, center)
-    [0, 0, 18],     // S key (center, center)
-    [22, 0, 18]     // D key (right, center)
-    
-];
+button_layout = [[-19,38,18,0],[0,38,18,0],[19,38,18,0],[38,38,18,0],[-19,19,18,0],[0,19,18,0],[19,19,18,0],[38,19,18,18],[-19,0,18,0],[0,0,18,0],[19,0,18,0],[-19,-19,18,0],[0,-19,18,0],[19,-19,18,0],[38,0,18,18],[-9.5,-38,18,37],[19,-38,18,0]];
 
 //3x3 keyboard layout
 ThreexLayout = [
-  [0, 35, 20],    // Top center button [x, y, size]
-  [-35, -15, 20], // Bottom left button
-  [0, -15, 20],   // Bottom center button
-  [35, -15, 20]   // Bottom right button
+  // W key (centered above S)
+    [0, 19, "W", 18],
+    
+    // A, S, D keys (horizontal row)
+    [-19, 0, "A", 18],  // A key
+    [0, 0, "S", 18],    // S key
+    [19, 0, "D", 18]   // D key
 ];
 
 keyboard_layout = [
@@ -86,18 +83,7 @@ keyboard_layout = [
 // Use 0 for case_width and case_depth to auto-size
 
 button_params = 
-[
-    0, //case_width
-    0, //case_depth
-    2.5, //wall_thickness
-    2, //corner_radius
-    2, //top_thickness
-    18, //button_size
-    8, //edge_margin
-    2, //lip_height
-    0.1, //lip_clearance
-    6 //case_height
-];
+[0,0,2.5,2,2,18,8,2,0.1,10];
 
 /* [Hidden] */
 $fn = 32;
@@ -107,7 +93,7 @@ function get_case_dimensions(layout, button_size, margin) =
     let(
         // Extract x and y from layout
         layout_coords = [for (btn = layout) 
-                          [btn[0], btn[1], btn[2]]],
+                          [btn[0], btn[1], btn[3]]],
         // Calculate extents
         layout_max_x = max([for (coord = layout_coords) coord[0] + 
                         (len(coord) > 2 ? coord[2] : button_size)/2]),
@@ -149,9 +135,11 @@ module place_buttons(layout, btn_size, top_thickness, case_height, case_width, c
     offset = get_center_offset(layout, btn_size);
     for (btn = layout) {
         x = btn[0] - offset[0];
-        y = btn[1] - offset[1]; 
-        size = len(btn) > 2 ? btn[2] : btn_size;
-        size2 = len(btn) > 3 ? btn[3] : 0;
+        y = btn[1] - offset[1];
+        letter = len(btn) > 2 ? btn[2] : "";
+        echo("Button: ", letter, " at (", x, ", ", y, ")");
+        size = len(btn) > 3 ? btn[3] : btn_size;
+        size2 = len(btn) > 4 ? btn[4] : 0;
 
         translate([x, y, 0]) {
             if (!SHOW_ASSEMBLED) {
@@ -161,11 +149,11 @@ module place_buttons(layout, btn_size, top_thickness, case_height, case_width, c
             }
 
             if (SHOW_ASSEMBLED) {
-                color("lightgray") create_keycap(size, size2, top_thickness,
-                                            case_height, 0, 0, top_thickness + 2);
+                create_keycap(size, size2, top_thickness,
+                                            case_height, 0, 0, top_thickness + 2, letter);
             } else {
-                color("lightgray") create_keycap(size, size2, top_thickness,
-                                            case_height, case_width, case_depth, 0);
+                create_keycap(size, size2, top_thickness,
+                                            case_height, case_width, case_depth, 0, letter);
             }
         }
     }
@@ -196,7 +184,7 @@ module top_plate(layout, params=[]) {
             for (btn = layout) {
                 x = btn[0] - offset[0];
                 y = btn[1] - offset[1];
-                size = len(btn) > 2 ? btn[2] : button_size;
+                size = len(btn) > 3 ? btn[3] : button_size;
                 
                 translate([x, y, 0])
                 cylinder(h=top_thickness+0.2, d=size);
@@ -218,7 +206,7 @@ module top_plate(layout, params=[]) {
             for (btn = layout) {
                 x = btn[0] - offset[0];
                 y = btn[1] - offset[1];
-                size = len(btn) > 2 ? btn[2] : button_size;
+                size = len(btn) > 3 ? btn[3] : button_size;
                 
                 translate([x, y, -0.1])
                 cylinder(h=lip_height+0.2, d=size);
@@ -255,36 +243,37 @@ module bottom_case(layout, params=[]) {
                 rounding=corner_radius, except=BOTTOM, anchor=BOTTOM);
 
         // Button cutouts
-        /*
+        
         if (SHOW_CUTOUTS) {
             for (btn = layout) {
                 x = btn[0] - offset[0];
                 y = btn[1] - offset[1];
-                size = len(btn) > 2 ? btn[2] : button_size;
+                size = len(btn) > 3 ? btn[3] : button_size;
                 
                 translate([x, y, 0])
                 cylinder(h=wall_thickness+0.2, d=size);
             }
-        }*/
+        
     }
 
     //Create touchpoints
-    /*
+    
     if(!SHOW_ASSEMBLED) {
         for (btn = layout) {
             x = btn[0] - offset[0];
             y = btn[1] - offset[1];
-            size = len(btn) > 2 ? btn[2] : button_size;
+            size = len(btn) > 3 ? btn[3] : button_size;
             
             translate([x, y, 0])
             color("black") cylinder(h=wall_thickness, d=size);
         }
-    }*/
+    }
+}
 }
 
 module wires (layout, case_width, button_size, top_thickness) {
     //Every unique y value
-    //list = [0, 22, 44];
+    list = [0, 22, 44];
     //list = [20, 42, 64, 86, 108, 130];
     offset = get_center_offset(layout, button_size);
     //wire_offset = ((button_size/2)-(button_size*0.04));
@@ -323,7 +312,7 @@ module input_device(layout, params=[]) {
     auto_size = (case_width == 0 || case_depth == 0);
     case_dims = auto_size ? 
                 get_case_dimensions(layout, button_size, edge_margin) : 
-                [case_width, case_depth];
+                [case_width+edge_margin, case_depth+edge_margin];
 
     parameters = [case_dims[0], case_dims[1], wall_thickness, corner_radius, 
                   top_thickness, button_size, edge_margin, lip_height, 
@@ -333,6 +322,7 @@ module input_device(layout, params=[]) {
         if (SHOW_ASSEMBLED) {
             up(case_height+top_thickness)
             rotate([0,180,0])
+            mirror([1,0,0])
             {
                 difference() {
                         union() {
@@ -347,6 +337,7 @@ module input_device(layout, params=[]) {
             }
         } else {
             // Show top separated for better visibility
+            mirror([1,0,0])
             right(case_dims[0]+ASSEMBLY_GAP) {
                     // Show top plate with cutouts
                     top_plate(layout, parameters);
@@ -367,6 +358,6 @@ module input_device(layout, params=[]) {
 }
 
 // Create the input device
-input_device(button_layout, button_params);
+//input_device(button_layout, button_params);
 //input_device(keyboard_layout, button_params);
-//input_device(ThreexLayout, button_params);
+input_device(ThreexLayout, button_params);
