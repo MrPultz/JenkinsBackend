@@ -72,18 +72,17 @@ module create_rings(r, outer_thickness, middle_offset, middle_thickness,
     }
 }
 
-module create_keycap(size1, size2, outer_height, case_height, x_offset, y_offset, z_offset) {
+module create_keycap(size1, size2, outer_height, case_height, x_offset, y_offset, z_offset, letter = "") {
     // Ring parameters'
-    echo("Creating keycap with size1: ", size1);
     outer_ring_d = size1 * ring_width_ratio; // 8% of diameter
     middle_ring_offset = outer_ring_d + (size1 * ring_spacing); // 2% spacing
     middle_ring_d = size1 * ring_width_ratio; // 8% of diameter
     inner_offset = middle_ring_offset + middle_ring_d + (size1 * ring_spacing); // 2% spacing
-    echo("Inner offset keycap: ", inner_offset);
-    letter = ""; // Default letter to be engraved
+
     //echo("Creating keycap with size1: ", size1, ", size2: ", size2);
     // Create the keycap with the specified diameter and outer ring height
     translate([x_offset, y_offset, -z_offset])
+    color("lightgray")
     difference() {
         union() {
         if(size2 == 0){
@@ -97,10 +96,18 @@ module create_keycap(size1, size2, outer_height, case_height, x_offset, y_offset
 
         // Add letter if provided
         if (letter != "") {
-            echo("Adding letter: ", letter);
             linear_extrude(2)
-            text(text=letter, size=5, halign="center", valign="center", font="Liberation Sans:style=Bold");
+            text(text=letter, size=size1/6, halign="center", valign="center", font="Liberation Sans:style=Bold", direction="ltr");
         }
+    }
+
+    translate([x_offset, y_offset, -z_offset])
+    // Add letter if provided
+    if (letter != "") {
+        echo("Adding letter: ", letter);
+        color("black")
+        linear_extrude(2)
+        text(text=letter, size=size1/6, halign="center", valign="center", font="Liberation Sans:style=Bold", direction="ltr");
     }
 }   
 
