@@ -1294,6 +1294,16 @@ app.post('/api/generate-previews', async (req, res) => {
         // Log the entire request body for debugging
         console.log('Request body:', JSON.stringify(req.body, null, 2));
 
+        // Path to the existing SCAD files - Define these at the beginning of the function
+        const inputDeviceScad = path.join(__dirname, 'input_device.scad');
+        const parametricButtonScad = path.join(__dirname, 'ParametricButton.scad');
+
+        // Check if the necessary SCAD files exist
+        if (!fs.existsSync(inputDeviceScad) || !fs.existsSync(parametricButtonScad)) {
+            console.error(`Missing SCAD files. inputDeviceScad exists: ${fs.existsSync(inputDeviceScad)}, parametricButtonScad exists: ${fs.existsSync(parametricButtonScad)}`);
+            return res.status(500).send('Required SCAD files not found');
+        }
+
         // Get designs from the request body
         let designs = [];
 
@@ -1377,14 +1387,32 @@ app.post('/api/generate-previews', async (req, res) => {
 
                 console.log(`Generating preview for design ID: ${design.id || 'unknown'}`);
 
-                // OpenSCAD command for rendering to PNG
-                // --render option ensures fully rendered image
-                // --colorscheme option for consistent coloring
-                // --camera option for consistent view
-                const inputDeviceScad = path.join(__dirname, 'input_device.scad');
-                const parametricButtonScad = path.join(__dirname, 'ParametricButton.scad');
+                // Create an intermediate SCAD file that includes the layout
+                const tempScadFile = path.join(tempDir, `${uniqueID}_input.scad`);
+                tempFiles.push(tempScadFile);
 
-                const openScadCmd = `openscad --preview -o "${pngFile}" --imgsize=800,600 --colorscheme=Tomorrow --camera=20,-120,140,60,0,20,500 "${inputDeviceScad}" -D "ThreexLayout=${formatArrayForOpenSCAD(buttonLayout)}" -D "button_params=${formatArrayForOpenSCAD(buttonParams)}"`;
+                // Format the SCAD content
+                const scadContent = `
+include <${inputDeviceScad.replace(/\\/g, '/')}>
+include <${parametricButtonScad.replace(/\\/g, '/')}>
+
+// Button layout configuration
+ThreexLayout = ${formatArrayForOpenSCAD(buttonLayout)};
+
+// Button parameters
+button_params = ${formatArrayForOpenSCAD(buttonParams)};
+
+// Visualization settings
+SHOW_ASSEMBLED = true;
+SHOW_BUTTONS = true;
+BUTTON_VISUAL_SCALE = 1;
+`;
+
+                // Write the content to the file
+                await fs.writeFile(tempScadFile, scadContent);
+
+                // Change the OpenSCAD command to use the file directly
+                const openScadCmd = `openscad --preview -o "${pngFile}" --imgsize=800,600 --colorscheme=Tomorrow --camera=20,-120,140,60,0,20,500 "${tempScadFile}"`;
 
                 console.log(`Running OpenSCAD preview command for design ${design.id || 'unknown'}`);
 
@@ -1727,16 +1755,33 @@ app.post('/api/generate-stl', async (req, res) => {
         try {
             console.log(`Starting OpenSCAD conversion for design ${designId || 'unknown'}`);
 
-            // Build the OpenSCAD command
-            let openScadCmd;
-            if (buttonParams) {
-                // Use both layout and params
-                openScadCmd = `openscad --debug all -q -o "${stlFile}" "${inputDeviceScad}" -D "button_layout=${formatArrayForOpenSCAD(buttonLayout)}" -D "button_params=${formatArrayForOpenSCAD(buttonParams)}"`;
-            } else {
-                // Use only layout with default params
-                openScadCmd = `openscad --debug all -q -o "${stlFile}" "${inputDeviceScad}" -D "button_layout=${formatArrayForOpenSCAD(buttonLayout)}"`;
-            }
+            // Create an intermediate SCAD file to avoid command line escaping issues
+            const tempScadFile = path.join(tempDir, `${uniqueID}_input.scad`);
+            tempFiles.push(tempScadFile);
 
+            // Format the SCAD content
+            const scadContent = `
+include <${inputDeviceScad.replace(/\\/g, '/')}>
+include <${parametricButtonScad.replace(/\\/g, '/')}>
+
+// Button layout configuration
+ThreexLayout = ${formatArrayForOpenSCAD(buttonLayout)};
+
+// Button parameters
+button_params = ${formatArrayForOpenSCAD(buttonParams || [])};
+
+// Visualization settings
+SHOW_ASSEMBLED = true;
+SHOW_BUTTONS = true;
+BUTTON_VISUAL_SCALE = 1;
+`;
+
+            // Write the content to the file
+            await fs.writeFile(tempScadFile, scadContent);
+            console.log(`Created temporary SCAD file: ${tempScadFile}`);
+
+            // Use the temp file in the OpenSCAD command
+            const openScadCmd = `openscad --debug all -q -o "${stlFile}" "${tempScadFile}"`;
             console.log(`Running command: ${openScadCmd}`);
 
             await new Promise((resolve, reject) => {
@@ -1761,7 +1806,7 @@ app.post('/api/generate-stl', async (req, res) => {
                 setTimeout(() => {
                     process.kill();
                     reject(new Error('OpenSCAD operation timed out after 3 minutes'));
-                }, 180000); // 3 minute timeout
+                }, 600000); // 3 minute timeout
             });
 
             // Check if STL file was created and has valid content
