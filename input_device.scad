@@ -4,6 +4,11 @@ include <BOSL2/std.scad>
 include <BOSL2/transforms.scad>
 include <BOSL2/math.scad>
 
+$vpr =([25,0,10]);
+$vpt =([0,0,0]);
+$vpf =(20);
+$vpd =(400);
+
 /* [Main Parameters] */
 // Default values - can be overridden by passed parameters
 DEFAULT_CASE_WIDTH = 140;
