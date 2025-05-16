@@ -93,17 +93,12 @@ module create_keycap(size1, size2, outer_height, case_height, x_offset, y_offset
             translate([0, 0, outer_height+2])
             cylinder(d=size1*0.4, h=case_height+1);
         }
-
-        // Add letter if provided
-        if (letter != "") {
-            linear_extrude(2)
-            text(text=letter, size=size1/6, halign="center", valign="center", font="Liberation Sans:style=Bold", direction="ltr");
-        }
     }
 
     translate([x_offset, y_offset, -z_offset*1.05])
+    mirror([0,1,0])
     // Add letter if provided
-    if (letter != "") {
+    if (letter != "") {  
         echo("Adding letter: ", letter);
         color("black")
         linear_extrude(2)
