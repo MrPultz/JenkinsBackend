@@ -182,7 +182,7 @@ module top_plate(layout, params=[]) {
     difference() {
         // Solid shape
         cuboid([case_width, case_depth, top_thickness],
-                rounding=corner_radius, edges="Z", anchor=BOTTOM);
+                rounding=corner_radius, except=TOP, anchor=BOTTOM);
 
         // Button cutouts
         if (SHOW_CUTOUTS) {
@@ -324,10 +324,10 @@ module input_device(layout, params=[]) {
                   lip_clearance, case_height];
 
     if (SHOW_TOP) {
+        mirror([1,0,0])
         if (SHOW_ASSEMBLED) {
             up(case_height+top_thickness)
-            rotate([0,180,0])
-            mirror([1,0,0])
+            rotate([0,180,180])
             {
                 difference() {
                         union() {
@@ -342,7 +342,6 @@ module input_device(layout, params=[]) {
             }
         } else {
             // Show top separated for better visibility
-            mirror([1,0,0])
             right(case_dims[0]+ASSEMBLY_GAP) {
                     // Show top plate with cutouts
                     top_plate(layout, parameters);
