@@ -44,13 +44,22 @@ button_layout = [[-19,38,18,0],[0,38,18,0],[19,38,18,0],[38,38,18,0],[-19,19,18,
 
 //3x3 keyboard layout
 ThreexLayout = [
+  // Number keys (1-4)
+  [-30, 40, "1", 18],
+  [-10, 40, "2", 18],
+  [10, 40, "3", 18],
+  [30, 40, "4", 18],
+  
   // W key (centered above S)
-    [50, 0, "W", 45],
-
-    // A, S, D keys (horizontal row)
-    [0, 50, "A", 45],  // A key
-    [50, 50, "S", 45],    // S key
-    [100, 50, "D", 45]   // D key
+  [-20, 0, "W", 18],
+  
+  // A, S, D keys (horizontal row)
+  [-40, -20, "A", 18],
+  [-20, -20, "S", 18],
+  [0, -20, "D", 18],
+  
+  // Space bar (centered below S, wider than other keys)
+  [0, -50, "SPACE", 18, 80]
 ];
 
 keyboard_layout = [
@@ -108,7 +117,7 @@ keyboard_layout = [
 // Use 0 for case_width and case_depth to auto-size
 
 button_params =
-[170,100,2.5,2,2,18,8,2,0.1,10];
+[140,120,2.5,2,2,18,8,2,0.1,10];
 
 /* [Hidden] */
 $fn = 32;
@@ -344,9 +353,10 @@ module input_device(layout, params=[]) {
                   lip_clearance, case_height];
 
     if (SHOW_TOP) {
+        mirror([0,1,0])
         if (SHOW_ASSEMBLED) {
             up(case_height+top_thickness)
-            rotate([0,180,0])
+            rotate([0,180,180])
             {
                 difference() {
                         union() {

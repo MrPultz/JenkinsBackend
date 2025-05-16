@@ -79,7 +79,6 @@ module create_keycap(size1, size2, outer_height, case_height, x_offset, y_offset
     middle_ring_d = size1 * ring_width_ratio; // 8% of diameter
     inner_offset = middle_ring_offset + middle_ring_d + (size1 * ring_spacing); // 2% spacing
 
-    //echo("Creating keycap with size1: ", size1, ", size2: ", size2);
     // Create the keycap with the specified diameter and outer ring height
     translate([x_offset, y_offset, -z_offset])
     color("lightgray")
@@ -96,7 +95,6 @@ module create_keycap(size1, size2, outer_height, case_height, x_offset, y_offset
     }
 
     translate([x_offset, y_offset, -z_offset*1.05])
-    mirror([0,1,0])
     // Add letter if provided
     if (letter != "") {  
         echo("Adding letter: ", letter);
