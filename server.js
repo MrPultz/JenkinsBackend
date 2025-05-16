@@ -1412,7 +1412,7 @@ BUTTON_VISUAL_SCALE = 1;
                 await fs.writeFile(tempScadFile, scadContent);
 
                 // Change the OpenSCAD command to use the file directly
-                const openScadCmd = `openscad --preview -o "${pngFile}" --imgsize=800,600 --colorscheme=Tomorrow --camera=20,-120,140,60,0,20,500 "${tempScadFile}"`;
+                const openScadCmd = `openscad --preview -o "${pngFile}" --imgsize=800,600 --colorscheme=Tomorrow "${tempScadFile}"`;
 
                 console.log(`Running OpenSCAD preview command for design ${design.id || 'unknown'}`);
 

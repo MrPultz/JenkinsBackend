@@ -7,7 +7,7 @@ include <BOSL2/math.scad>
 $vpr =([25,0,10]);
 $vpt =([0,0,0]);
 $vpf =(20);
-$vpd =(400);
+$vpd =(300);
 
 /* [Main Parameters] */
 // Default values - can be overridden by passed parameters
