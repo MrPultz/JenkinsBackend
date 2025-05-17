@@ -96,7 +96,8 @@ module create_keycap(size1, size2, outer_height, case_height, x_offset, y_offset
 
     translate([x_offset, y_offset, -z_offset*1.05])
     // Add letter if provided
-    if (letter != "") {  
+    mirror([0,1,0]) // Added this again as it fixed the letters after needing it because of the mirror in the other file
+    if (letter != "") {
         echo("Adding letter: ", letter);
         color("black")
         linear_extrude(2)
