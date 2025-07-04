@@ -7,10 +7,10 @@
 * Administrative privileges for software installation
 
 ### Backend Dependencies
-1. OpenSCAD Installation
+### 1. OpenSCAD Installation
 
 
-### Windows:
+#### Windows:
 1. Download OpenSCAD from https://openscad.org/downloads.html
 2. Install the Windows version (typically OpenSCAD-2023.12.23-x86_64-Installer.exe)
 3. During installation, ensure "Add to PATH" is selected
@@ -19,21 +19,21 @@
 openscad --version
 ```
 
-### Linux (Ubunto/Debian):
+#### Linux (Ubunto/Debian):
 ```bash
 sudo apt-get update
 sudo apt-get install openscad
 ```
 
-### Linux (CentOS/RHel):
+#### Linux (CentOS/RHel):
 ```bash
 sudo yum install openscad
 ```
 
-2. 3D Printing Slicing tools of your choice
+### 2. 3D Printing Slicing tools of your choice
 This will be an example with PrusaSlicer
 
-### Windows:
+#### Windows:
 1. Download PrusaSlicer from https://www.prusa3d.com/page/prusaslicer_424/
 2. Install the Windows version
 3. The installer typically places PrusaSlicer in:
@@ -44,7 +44,7 @@ This will be an example with PrusaSlicer
 "C:\Program Files\Prusa3D\PrusaSlicer\prusa-slicer-console.exe" --version
 ```
 
-### Linux
+#### Linux
 1. Download the Linux AppImage from the Prusa website
 2. Extract to /opt/ directory:
 ```bash
@@ -55,7 +55,7 @@ sudo ln -s /opt/PrusaSlicer-*/bin/prusa-slicer /usr/local/bin/prusa-slicer
 ### Project Setup
 1. Clone the Repository
 ```bash
-git clone <repository-url>
+git clone https://github.com/MrPultz/JenkinsBackend/
 cd JenkinsBackend
 ```
 2. Install Node.js Dependencies
