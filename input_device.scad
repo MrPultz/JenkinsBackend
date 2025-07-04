@@ -4,6 +4,11 @@ include <BOSL2/std.scad>
 include <BOSL2/transforms.scad>
 include <BOSL2/math.scad>
 
+$vpr =([25,0,10]);
+$vpt =([0,0,0]);
+$vpf =(20);
+$vpd =(500);
+
 /* [Main Parameters] */
 // Default values - can be overridden by passed parameters
 DEFAULT_CASE_WIDTH = 140;
@@ -23,8 +28,8 @@ BUTTON_VISUAL_SCALE = 1;
 // Show assembled view
 SHOW_ASSEMBLED = false;
 // Show button cutouts in top plate
-SHOW_CUTOUTS = false;
-// Show actual buttons 
+SHOW_CUTOUTS = true;
+// Show actual buttons
 SHOW_BUTTONS = true;
 // Show bottom case
 SHOW_BOTTOM = true;
@@ -39,51 +44,91 @@ button_layout = [[-19,38,18,0],[0,38,18,0],[19,38,18,0],[38,38,18,0],[-19,19,18,
 
 //3x3 keyboard layout
 ThreexLayout = [
+  // Number keys (1-4)
+  [-30, 40, "1", 18],
+  [-10, 40, "2", 18],
+  [10, 40, "3", 18],
+  [30, 40, "4", 18],
+
   // W key (centered above S)
-    [0, 19, "W", 18],
-    
-    // A, S, D keys (horizontal row)
-    [-19, 0, "A", 18],  // A key
-    [0, 0, "S", 18],    // S key
-    [19, 0, "D", 18]   // D key
+  [-20, 0, "W", 18],
+
+  // A, S, D keys (horizontal row)
+  [-40, -20, "A", 18],
+  [-20, -20, "S", 18],
+  [0, -20, "D", 18],
+
+  // Space bar (centered below S, wider than other keys)
+  [0, -50, "SPACE", 18, 80]
 ];
 
 keyboard_layout = [
-    // Function row
-    [20, 20, 18], [42, 20, 18], [64, 20, 18], [86, 20, 18], [118, 20, 18], [140, 20, 18], [162, 20, 18], [184, 20, 18], [206, 20, 18], [228, 20, 18], [250, 20, 18], [272, 20, 18], [294, 20, 18],
-    // Navigation cluster
-    [320, 20, 18], [342, 20, 18], [364, 20, 18],
-    
-    // Number row
-    [20, 42, 18], [42, 42, 18], [64, 42, 18], [86, 42, 18], [108, 42, 18], [130, 42, 18], [152, 42, 18], [174, 42, 18], [196, 42, 18], [218, 42, 18], [240, 42, 18], [262, 42, 18], [294, 42, 18, 28],
-    // Navigation cluster
-    [320, 42, 18], [342, 42, 18], [364, 42, 18],
-    
-    // Top letter row
-    [23, 64, 18], [45, 64, 18], [67, 64, 18], [89, 64, 18], [111, 64, 18], [133, 64, 18], [155, 64, 18], [177, 64, 18], [199, 64, 18], [221, 64, 18], [243, 64, 18], [265, 64, 18], [294, 64, 18, 28],
-    // Navigation cluster
-    [320, 64, 18], [342, 64, 18], [364, 64, 18],
-    
-    // Home row
-    [27, 86, 18, 28], [59, 86, 18], [81, 86, 18], [103, 86, 18], [125, 86, 18], [147, 86, 18], [169, 86, 18], [191, 86, 18], [213, 86, 18], [235, 86, 18], [257, 86, 18], [288, 86, 18, 36],
-    
-    // Bottom letter row
-    [32, 108, 18, 36], [72, 108, 18], [94, 108, 18], [116, 108, 18], [138, 108, 18], [160, 108, 18], [182, 108, 18], [204, 108, 18], [226, 108, 18], [248, 108, 18], [280, 108, 18, 44],
-    // Arrow up key
-    [342, 108, 18],
-    
-    // Bottom row
-    [32, 130, 18, 26], [62, 130, 18, 26], [92, 130, 18, 26], [166, 130, 18, 112], [246, 130, 18, 26], [276, 130, 18, 26],
-    // Arrow keys
-    [320, 130, 18], [342, 130, 18], [364, 130, 18],
-  ];
+  // Function row
+  [20, 20, "Esc", 18],   [42, 20, "F1", 18],    [64, 20, "F2", 18],    [86, 20, "F3", 18],
+  [118, 20, "F4", 18],   [140, 20, "F5", 18],   [162, 20, "F6", 18],   [184, 20, "F7", 18],
+  [206, 20, "F8", 18],   [228, 20, "F9", 18],   [250, 20, "F10", 18],  [272, 20, "F11", 18],
+  [294, 20, "F12", 18],
+
+  // Navigation cluster
+  [320, 20, "PrtSc", 18], [342, 20, "ScrLk", 18], [364, 20, "Pause", 18],
+
+  // Number row
+  [20, 42, "`", 18],     [42, 42, "1", 18],     [64, 42, "2", 18],     [86, 42, "3", 18],
+  [108, 42, "4", 18],    [130, 42, "5", 18],    [152, 42, "6", 18],    [174, 42, "7", 18],
+  [196, 42, "8", 18],    [218, 42, "9", 18],    [240, 42, "0", 18],    [262, 42, "-", 18],
+  [294, 42, "Backspace", 18, 28],
+
+  // Navigation cluster
+  [320, 42, "Ins", 18],   [342, 42, "Home", 18], [364, 42, "PgUp", 18],
+
+  // Top letter row
+  [23, 64, "Tab", 18],   [45, 64, "Q", 18],     [67, 64, "W", 18],     [89, 64, "E", 18],
+  [111, 64, "R", 18],    [133, 64, "T", 18],    [155, 64, "Y", 18],    [177, 64, "U", 18],
+  [199, 64, "I", 18],    [221, 64, "O", 18],    [243, 64, "P", 18],    [265, 64, "[", 18],
+  [294, 64, "\\", 18, 28],
+
+  // Navigation cluster
+  [320, 64, "Del", 18],   [342, 64, "End", 18],  [364, 64, "PgDn", 18],
+
+  // Home row
+  [27, 86, "Caps", 18, 28], [59, 86, "A", 18],    [81, 86, "S", 18],     [103, 86, "D", 18],
+  [125, 86, "F", 18],      [147, 86, "G", 18],    [169, 86, "H", 18],    [191, 86, "J", 18],
+  [213, 86, "K", 18],      [235, 86, "L", 18],    [257, 86, ";", 18],    [288, 86, "Enter", 18, 36],
+
+  // Bottom letter row
+  [32, 108, "Shift", 18, 36], [72, 108, "Z", 18],    [94, 108, "X", 18],     [116, 108, "C", 18],
+  [138, 108, "V", 18],        [160, 108, "B", 18],   [182, 108, "N", 18],    [204, 108, "M", 18],
+  [226, 108, ",", 18],        [248, 108, ".", 18],   [280, 108, "Shift", 18, 44],
+
+  // Arrow up key
+  [342, 108, "↑", 18],
+
+  // Bottom row
+  [32, 130, "Ctrl", 18, 26],  [62, 130, "Win", 18, 26],  [92, 130, "Alt", 18, 26],
+  [166, 130, "Space", 18, 112],
+  [246, 130, "Alt", 18, 26],  [276, 130, "Ctrl", 18, 26],
+
+  // Arrow keys
+  [320, 130, "←", 18],        [342, 130, "↓", 18],       [364, 130, "→", 18],
+];
 
 // Customize parameters as needed
 // Format: [case_width, case_depth, wall_thickness, corner_radius, top_thickness, button_size, edge_margin, lip_height, lip_clearance, case_height]
 // Use 0 for case_width and case_depth to auto-size
 
-button_params = 
-[0,0,2.5,2,2,18,8,2,0.1,10];
+button_params =
+[
+    0, //case_width
+    0, //case_depth
+    2.5, //wall_thickness
+    2, //corner_radius
+    2, //top_thickness
+    18, //button_size
+    8, //edge_margin
+    2, //lip_height
+    0.1, //lip_clearance
+    6 //case_height
+];
 
 /* [Hidden] */
 $fn = 32;
@@ -92,16 +137,16 @@ $fn = 32;
 function get_case_dimensions(layout, button_size, margin) =
     let(
         // Extract x and y from layout
-        layout_coords = [for (btn = layout) 
-                          [btn[0], btn[1], btn[3]]],
+        layout_coords = [for (btn = layout)
+                          [btn[0], btn[1], btn[2]]],
         // Calculate extents
-        layout_max_x = max([for (coord = layout_coords) coord[0] + 
+        layout_max_x = max([for (coord = layout_coords) coord[0] +
                         (len(coord) > 2 ? coord[2] : button_size)/2]),
-        layout_min_x = min([for (coord = layout_coords) coord[0] - 
+        layout_min_x = min([for (coord = layout_coords) coord[0] -
                         (len(coord) > 2 ? coord[2] : button_size)/2]),
-        layout_max_y = max([for (coord = layout_coords) coord[1] + 
+        layout_max_y = max([for (coord = layout_coords) coord[1] +
                         (len(coord) > 2 ? coord[2] : button_size)/2]),
-        layout_min_y = min([for (coord = layout_coords) coord[1] - 
+        layout_min_y = min([for (coord = layout_coords) coord[1] -
                         (len(coord) > 2 ? coord[2] : button_size)/2]),
         // Add margin and calculate final size
         width = (layout_max_x - layout_min_x) + margin,
@@ -113,16 +158,16 @@ function get_case_dimensions(layout, button_size, margin) =
 function get_center_offset(layout, button_size) =
     let(
         // Extract x and y from layout
-        layout_coords = [for (btn = layout) 
+        layout_coords = [for (btn = layout)
                         [btn[0], btn[1]]],
         // Calculate extents
-        layout_max_x = max([for (coord = layout_coords) coord[0] + 
+        layout_max_x = max([for (coord = layout_coords) coord[0] +
                         (len(coord) > 2 ? coord[2] : button_size)/2]),
-        layout_min_x = min([for (coord = layout_coords) coord[0] - 
+        layout_min_x = min([for (coord = layout_coords) coord[0] -
                         (len(coord) > 2 ? coord[2] : button_size)/2]),
-        layout_max_y = max([for (coord = layout_coords) coord[1] + 
+        layout_max_y = max([for (coord = layout_coords) coord[1] +
                         (len(coord) > 2 ? coord[2] : button_size)/2]),
-        layout_min_y = min([for (coord = layout_coords) coord[1] - 
+        layout_min_y = min([for (coord = layout_coords) coord[1] -
                         (len(coord) > 2 ? coord[2] : button_size)/2]),
         // Calculate center
         center_x = (layout_max_x + layout_min_x) / 2,
@@ -130,7 +175,7 @@ function get_center_offset(layout, button_size) =
     )
     [center_x, center_y];
 
-// Button layout visualization 
+// Button layout visualization
 module place_buttons(layout, btn_size, top_thickness, case_height, case_width, case_depth, show_outlines=false) {
     offset = get_center_offset(layout, btn_size);
     for (btn = layout) {
@@ -143,7 +188,7 @@ module place_buttons(layout, btn_size, top_thickness, case_height, case_width, c
 
         translate([x, y, 0]) {
             if (!SHOW_ASSEMBLED) {
-                // Actual button               
+                // Actual button
                 scale([BUTTON_VISUAL_SCALE, BUTTON_VISUAL_SCALE, 1])
                 color("lightgray") create_button(size, top_thickness);
             }
@@ -170,48 +215,48 @@ module top_plate(layout, params=[]) {
     button_size = params[5];
     edge_margin = params[6];
     lip_height = params[7];
-    lip_clearance = params[8];  
-    
+    lip_clearance = params[8];
+
     offset = get_center_offset(layout, button_size);
 
     difference() {
         // Solid shape
-        cuboid([case_width, case_depth, top_thickness], 
-                rounding=corner_radius, edges="Z", anchor=BOTTOM);
-        
+        cuboid([case_width, case_depth, top_thickness],
+                rounding=corner_radius, except=TOP, anchor=BOTTOM);
+
         // Button cutouts
         if (SHOW_CUTOUTS) {
             for (btn = layout) {
                 x = btn[0] - offset[0];
                 y = btn[1] - offset[1];
-                size = len(btn) > 3 ? btn[3] : button_size;
-                
+                size = len(btn) > 2 ? btn[2] : button_size;
+
                 translate([x, y, 0])
                 cylinder(h=top_thickness+0.2, d=size);
             }
         }
     }
-    
-    
+
+
     // Add lip for better fit
     lip_width = case_width - 2 * (wall_thickness + lip_clearance);
     lip_depth = case_depth - 2 * (wall_thickness + lip_clearance);
-    
+
     up(lip_height/2+top_thickness/2) {
         difference() {
-            cuboid([lip_width, lip_depth, lip_height], 
+            cuboid([lip_width, lip_depth, lip_height],
                     rounding=corner_radius, edges="Z", anchor=BOTTOM);
-            
+
             // Cut any overlapping holes
             for (btn = layout) {
                 x = btn[0] - offset[0];
                 y = btn[1] - offset[1];
-                size = len(btn) > 3 ? btn[3] : button_size;
-                
+                size = len(btn) > 2 ? btn[2] : button_size;
+
                 translate([x, y, -0.1])
                 cylinder(h=lip_height+0.2, d=size);
             }
-        
+
         }
     }
 }
@@ -228,42 +273,42 @@ module bottom_case(layout, params=[]) {
     case_height = params[9];
 
     offset = get_center_offset(layout, button_size);
-       
+
     // Outer shell
     difference() {
         // Solid case
-        cuboid([case_width, case_depth, case_height], 
+        cuboid([case_width, case_depth, case_height],
                 rounding=corner_radius, except=TOP, anchor=BOTTOM);
-    
+
         // Inner cutout
         translate([0, 0, wall_thickness])
-        cuboid([case_width - 2*wall_thickness, 
-                case_depth - 2*wall_thickness, 
-                case_height], 
+        cuboid([case_width - 2*wall_thickness,
+                case_depth - 2*wall_thickness,
+                case_height],
                 rounding=corner_radius, except=BOTTOM, anchor=BOTTOM);
 
         // Button cutouts
-        
+
         if (SHOW_CUTOUTS) {
             for (btn = layout) {
                 x = btn[0] - offset[0];
                 y = btn[1] - offset[1];
-                size = len(btn) > 3 ? btn[3] : button_size;
-                
+                size = len(btn) > 2 ? btn[2] : button_size;
+
                 translate([x, y, 0])
                 cylinder(h=wall_thickness+0.2, d=size);
             }
-        
+
     }
 
     //Create touchpoints
-    
+
     if(!SHOW_ASSEMBLED) {
         for (btn = layout) {
             x = btn[0] - offset[0];
             y = btn[1] - offset[1];
-            size = len(btn) > 3 ? btn[3] : button_size;
-            
+            size = len(btn) > 2 ? btn[2] : button_size;
+
             translate([x, y, 0])
             color("black") cylinder(h=wall_thickness, d=size);
         }
@@ -310,19 +355,19 @@ module input_device(layout, params=[]) {
 
     // Calculate dimensions from layout if needed
     auto_size = (case_width == 0 || case_depth == 0);
-    case_dims = auto_size ? 
-                get_case_dimensions(layout, button_size, edge_margin) : 
-                [case_width+edge_margin, case_depth+edge_margin];
+    case_dims = auto_size ?
+                get_case_dimensions(layout, button_size, edge_margin) :
+                [case_width, case_depth];
 
-    parameters = [case_dims[0], case_dims[1], wall_thickness, corner_radius, 
-                  top_thickness, button_size, edge_margin, lip_height, 
+    parameters = [case_dims[0], case_dims[1], wall_thickness, corner_radius,
+                  top_thickness, button_size, edge_margin, lip_height,
                   lip_clearance, case_height];
-    
+
     if (SHOW_TOP) {
+        // mirror([0,1,0])  // Removed this again because was fucked and added it to the text part..
         if (SHOW_ASSEMBLED) {
             up(case_height+top_thickness)
-            rotate([0,180,0])
-            mirror([1,0,0])
+            rotate([0,180,180])
             {
                 difference() {
                         union() {
@@ -332,8 +377,8 @@ module input_device(layout, params=[]) {
                         place_buttons(layout, button_size, top_thickness, case_height-wall_thickness, case_dims[0], case_dims[1]);
                         }
                 }
-                
-                
+
+
             }
         } else {
             // Show top separated for better visibility
@@ -344,7 +389,7 @@ module input_device(layout, params=[]) {
                     // Show buttons
                     place_buttons(layout, button_size, top_thickness, case_height-wall_thickness, case_dims[0], case_dims[1]);
 
-                
+
             }
         }
     }

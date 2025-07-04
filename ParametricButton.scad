@@ -2,7 +2,7 @@ include <BOSL2/std.scad>
 
 // Default diameter - used when no parameter is provided
 default_button_diameter = 18;
-default_outer_ring_height = 3.5; 
+default_outer_ring_height = 3.5;
 default_case_height = 0;
 // Fixed mechanical parameters
 bend_height = 0.725; // Keep fixed for mechanical properties
@@ -16,7 +16,7 @@ module create_button(diameter = default_button_diameter, outer_ring_height = def
     echo(diameter);
     // Derived parameters based on input diameter
     button_radius = diameter / 2;
-    
+
     // Ring parameters
     outer_ring_d = diameter * ring_width_ratio; // 8% of diameter
     middle_ring_offset = outer_ring_d + (diameter * ring_spacing); // 2% spacing
@@ -29,44 +29,44 @@ module create_button(diameter = default_button_diameter, outer_ring_height = def
     bridge_height = diameter * 0.16;
 
     union() {
-        create_rings(button_radius, outer_ring_d, middle_ring_offset, 
-                    middle_ring_d, inner_ring_offset, outer_ring_height, 
+        create_rings(button_radius, outer_ring_d, middle_ring_offset,
+                    middle_ring_d, inner_ring_offset, outer_ring_height,
                     bend_height);
-        
+
         // Calculate bridge positions based on ring positions
         // West bridge - spans from outer ring to middle ring
-        translate([-(button_radius - inner_ring_offset), 0, bend_height/2]) 
+        translate([-(button_radius - inner_ring_offset), 0, bend_height/2])
             cube([bridge_width, bridge_height, bend_height], center = true);
 
         // East bridge - spans from middle ring to inner ring
-        translate([button_radius - inner_ring_offset, 0, bend_height/2]) 
+        translate([button_radius - inner_ring_offset, 0, bend_height/2])
             cube([bridge_width, bridge_height, bend_height], center = true);
-        
+
         // North bridge - spans across all rings
-        translate([0, -(button_radius - inner_ring_offset/2), bend_height/2]) 
+        translate([0, -(button_radius - inner_ring_offset/2), bend_height/2])
             cube([bridge_height, bridge_width, bend_height], center = true);
-        
+
         // South bridge - spans across all rings
-        translate([0, button_radius - inner_ring_offset/2, bend_height/2]) 
+        translate([0, button_radius - inner_ring_offset/2, bend_height/2])
             cube([bridge_height, bridge_width, bend_height], center = true);
     }
-  
-}   
 
-module create_rings(r, outer_thickness, middle_offset, middle_thickness, 
+}
+
+module create_rings(r, outer_thickness, middle_offset, middle_thickness,
                    inner_offset, outer_height, cross_w, cross_h, bend_h) {
     // Create outer ring
     difference() {
         cylinder(h=outer_height, r=r);
         cylinder(h=outer_height, r=r-outer_thickness);
     }
-    // Create middle ring    
+    // Create middle ring
     difference() {
         cylinder(h=bend_height, r=r-middle_offset);
         cylinder(h=bend_height, r=r-middle_offset-middle_thickness);
     }
     // Create Inner ring
-    difference() {   
+    difference() {
         cylinder(h=bend_height, r=r-inner_offset);
         cylinder(h=bend_height, r=r*0.4); // Inner hole for cross
     }
@@ -93,22 +93,17 @@ module create_keycap(size1, size2, outer_height, case_height, x_offset, y_offset
             translate([0, 0, outer_height+2])
             cylinder(d=size1*0.4, h=case_height+1);
         }
-
-        // Add letter if provided
-        if (letter != "") {
-            linear_extrude(2)
-            text(text=letter, size=size1/6, halign="center", valign="center", font="Liberation Sans:style=Bold", direction="ltr");
-        }
     }
 
-    translate([x_offset, y_offset, -z_offset])
+    translate([x_offset, y_offset, -z_offset*1.05])
     // Add letter if provided
+    mirror([0,1,0]) // Added this again as it fixed the letters after needing it because of the mirror in the other file
     if (letter != "") {
         echo("Adding letter: ", letter);
         color("black")
         linear_extrude(2)
         text(text=letter, size=size1/6, halign="center", valign="center", font="Liberation Sans:style=Bold", direction="ltr");
     }
-}   
+}
 
 //create_button(diameter = 18, outer_ring_height = 3.5, x_offset = 20); // Example usage with default parameters
